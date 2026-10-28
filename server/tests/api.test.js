@@ -288,24 +288,43 @@ describe('Bitácora TI - Pruebas del Backend y Seguridad', () => {
   });
 
   test('Módulo Inventario: registro de equipo y hoja de vida con servicios', async () => {
-    // 1. Crear equipo
+    // 0. Probar gestión de áreas (Jerarquía: Inventario > Área > Salón/Lab > Unidad)
+    const areasRes = await request(app)
+      .get('/api/inventory/areas')
+      .set('Cookie', authCookie);
+    assert.equal(areasRes.status, 200);
+    assert.ok(Array.isArray(areasRes.body));
+    assert.ok(areasRes.body.length >= 1);
+
+    // 1. Crear equipo con área y número de unidad
     const code = `PC-TEST-${Date.now().toString().slice(-4)}`;
     const createRes = await request(app)
       .post('/api/inventory')
       .set('Cookie', authCookie)
       .send({
         code,
-        name: 'PC Laboratorio Prueba',
+        name: 'PC Laboratorio Bachillerato 01',
+        area: 'Bachillerato',
+        location: 'Lab 1',
+        unit_number: 'PC 01',
         category: 'pc',
         brand: 'HP',
         model: 'ProDesk 600 G3',
-        location: 'Laboratorio 1',
         specs: 'Core i5-6500, 16GB RAM, SSD 480GB, Windows 11',
         status: 'operativo'
       });
 
     assert.equal(createRes.status, 201);
+    assert.equal(createRes.body.area, 'Bachillerato');
+    assert.equal(createRes.body.unit_number, 'PC 01');
     const equipId = createRes.body.id;
+
+    // Filtrar por área
+    const filterRes = await request(app)
+      .get('/api/inventory?area=Bachillerato')
+      .set('Cookie', authCookie);
+    assert.equal(filterRes.status, 200);
+    assert.ok(filterRes.body.some(eq => eq.id === equipId));
 
     // 2. Registrar servicio / intervención en la hoja de vida
     const serviceRes = await request(app)

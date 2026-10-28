@@ -18,18 +18,33 @@ import {
   Printer,
   Wifi,
   Tv,
-  Layers 
+  Folder,
+  ChevronRight,
+  FolderPlus,
+  ArrowLeft,
+  Grid,
+  List,
+  Layers,
+  Settings2 
 } from 'lucide-react';
 import { api } from '../api';
 
 export function InventarioView() {
+  const [activeTab, setActiveTab] = useState('areas'); // 'areas' | 'todos' | 'gestionar_areas'
+  
+  // Jerarquía de navegación: Inventario > Área > Ubicación/Lab
+  const [selectedArea, setSelectedArea] = useState(null); // string | null
+  const [selectedLocation, setSelectedLocation] = useState(null); // string | null
+
   const [equipmentList, setEquipmentList] = useState([]);
+  const [areasList, setAreasList] = useState([]);
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Filtros globales
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterLocation, setFilterLocation] = useState('');
 
   // Modal Hoja de Vida / Detalle
   const [selectedEquipment, setSelectedEquipment] = useState(null);
@@ -45,39 +60,79 @@ export function InventarioView() {
 
   // Modal registrar nuevo equipo
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newArea, setNewArea] = useState('Bachillerato');
+  const [newLocation, setNewLocation] = useState('Lab 1');
+  const [newUnitNumber, setNewUnitNumber] = useState('PC 01');
   const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('pc');
-  const [newBrand, setNewBrand] = useState('');
+  const [newBrand, setNewBrand] = useState('HP');
   const [newModel, setNewModel] = useState('');
-  const [newLocation, setNewLocation] = useState('');
   const [newSpecs, setNewSpecs] = useState('');
   const [newStatus, setNewStatus] = useState('operativo');
   const [newNotes, setNewNotes] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
+  // Modal / Formulario Nueva Área
+  const [areaNameInput, setAreaNameInput] = useState('');
+  const [areaDescInput, setAreaDescInput] = useState('');
+  const [isCreatingArea, setIsCreatingArea] = useState(false);
+
   useEffect(() => {
     loadData();
-  }, [searchTerm, filterCategory, filterStatus, filterLocation]);
+  }, [searchTerm, filterCategory, filterStatus, selectedArea, selectedLocation]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [listData, statsData] = await Promise.all([
+      const [listData, statsData, areasData] = await Promise.all([
         api.getInventory({
           q: searchTerm || undefined,
+          area: selectedArea || undefined,
+          location: selectedLocation || undefined,
           category: filterCategory || undefined,
-          status: filterStatus || undefined,
-          location: filterLocation || undefined
+          status: filterStatus || undefined
         }),
-        api.getInventoryStats()
+        api.getInventoryStats(),
+        api.getInventoryAreas()
       ]);
       setEquipmentList(listData);
       setStats(statsData);
+      setAreasList(areasData);
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCreateArea = async e => {
+    e.preventDefault();
+    if (!areaNameInput.trim()) return;
+
+    setIsCreatingArea(true);
+    try {
+      await api.createInventoryArea({
+        name: areaNameInput.trim(),
+        description: areaDescInput.trim() || null
+      });
+      setAreaNameInput('');
+      setAreaDescInput('');
+      loadData();
+    } catch (err) {
+      alert(err.message || 'Error al crear área');
+    } finally {
+      setIsCreatingArea(false);
+    }
+  };
+
+  const handleDeleteArea = async id => {
+    if (!window.confirm('¿Seguro que deseas eliminar esta área? Los equipos asignados se moverán al área General.')) return;
+    try {
+      await api.deleteInventoryArea(id);
+      loadData();
+    } catch (err) {
+      alert(err.message || 'Error al eliminar área');
     }
   };
 
@@ -124,19 +179,30 @@ export function InventarioView() {
     }
   };
 
+  // Auto-completar sugerencia de código al escribir área, salón y número
+  const handleAutoCode = (area, loc, unit) => {
+    const aShort = area.replace(/\s+/g, '').slice(0, 4).toUpperCase();
+    const lShort = loc.replace(/\s+/g, '').toUpperCase();
+    const uShort = unit.replace(/\s+/g, '').toUpperCase();
+    return `${aShort}-${lShort}-${uShort}`;
+  };
+
   const handleCreateEquipment = async e => {
     e.preventDefault();
-    if (!newCode.trim() || !newName.trim() || !newLocation.trim()) return;
+    const code = newCode.trim() || handleAutoCode(newArea, newLocation, newUnitNumber);
+    const name = newName.trim() || `${newCategory.toUpperCase()} ${newUnitNumber} (${newLocation})`;
 
     setIsCreating(true);
     try {
       await api.createEquipment({
-        code: newCode.trim(),
-        name: newName.trim(),
+        code: code.toUpperCase(),
+        name,
+        area: newArea.trim(),
+        location: newLocation.trim(),
+        unit_number: newUnitNumber.trim() || null,
         category: newCategory,
         brand: newBrand.trim() || null,
         model: newModel.trim() || null,
-        location: newLocation.trim(),
         specs: newSpecs.trim() || null,
         status: newStatus,
         notes: newNotes.trim() || null
@@ -145,9 +211,7 @@ export function InventarioView() {
       setShowCreateModal(false);
       setNewCode('');
       setNewName('');
-      setNewBrand('');
       setNewModel('');
-      setNewLocation('');
       setNewSpecs('');
       loadData();
     } catch (err) {
@@ -178,162 +242,366 @@ export function InventarioView() {
     }
   };
 
+  // Agrupación para la vista jerárquica:
+  // Si estamos en un Área, listar sus Ubicaciones/Salones
+  const locationsInSelectedArea = stats?.byLocation?.filter(l => l.area === selectedArea) || [];
+
   return (
     <div className="page-wrapper">
-      {/* Tarjetas de estadísticas superiores */}
+      {/* Resumen estadístico */}
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
           <div className="card" style={{ margin: 0, padding: '0.75rem' }}>
             <div style={{ fontSize: '11px', color: '#64748b' }}>Total Equipos</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{stats.total}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{stats.total}</div>
           </div>
           <div className="card" style={{ margin: 0, padding: '0.75rem', borderLeft: '3px solid #10b981' }}>
             <div style={{ fontSize: '11px', color: '#065f46' }}>Operativos</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#047857' }}>{stats.operativo}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#047857' }}>{stats.operativo}</div>
           </div>
           <div className="card" style={{ margin: 0, padding: '0.75rem', borderLeft: '3px solid #f59e0b' }}>
-            <div style={{ fontSize: '11px', color: '#b45309' }}>Mantenimiento</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#d97706' }}>{stats.mantenimiento}</div>
+            <div style={{ fontSize: '11px', color: '#b45309' }}>Req. Mantenimiento</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{stats.mantenimiento}</div>
           </div>
           <div className="card" style={{ margin: 0, padding: '0.75rem', borderLeft: '3px solid #ef4444' }}>
             <div style={{ fontSize: '11px', color: '#991b1b' }}>En Reparación</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#dc2626' }}>{stats.enReparacion}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#dc2626' }}>{stats.enReparacion}</div>
           </div>
         </div>
       )}
 
-      {/* Controles de búsqueda y filtros */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '10px', top: '12px', color: '#94a3b8' }} />
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Buscar por código (ej. PC-LAB1-01), specs, marca o aula..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '2rem' }}
-            />
-          </div>
-
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-            <Plus size={18} />
-            <span>Nuevo Equipo</span>
+      {/* Selector de Modo de Inventario */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', background: '#e2e8f0', padding: '3px', borderRadius: '8px' }}>
+          <button
+            className={`btn btn-sm ${activeTab === 'areas' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ border: 'none' }}
+            onClick={() => { setActiveTab('areas'); setSelectedArea(null); setSelectedLocation(null); }}
+          >
+            <Folder size={15} />
+            <span>Por Áreas y Salones</span>
+          </button>
+          <button
+            className={`btn btn-sm ${activeTab === 'todos' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ border: 'none' }}
+            onClick={() => { setActiveTab('todos'); setSelectedArea(null); setSelectedLocation(null); }}
+          >
+            <List size={15} />
+            <span>Lista Global (150)</span>
+          </button>
+          <button
+            className={`btn btn-sm ${activeTab === 'gestionar_areas' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ border: 'none' }}
+            onClick={() => setActiveTab('gestionar_areas')}
+          >
+            <Settings2 size={15} />
+            <span>Gestionar Áreas</span>
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <select
-            className="form-control"
-            value={filterCategory}
-            onChange={e => setFilterCategory(e.target.value)}
-            style={{ width: 'auto', minWidth: '140px' }}
-          >
-            <option value="">Todos los tipos</option>
-            <option value="pc">PC de Escritorio</option>
-            <option value="laptop">Laptops</option>
-            <option value="proyector">Proyectores</option>
-            <option value="impresora">Impresoras</option>
-            <option value="red">Red / Switches / Routers</option>
-            <option value="monitor">Monitores</option>
-            <option value="ups">Reguladores / UPS</option>
-            <option value="otro">Otros</option>
-          </select>
-
-          <select
-            className="form-control"
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-            style={{ width: 'auto', minWidth: '140px' }}
-          >
-            <option value="">Cualquier estado</option>
-            <option value="operativo">🟢 Operativo</option>
-            <option value="mantenimiento_pendiente">🟡 Requiere Mantenimiento</option>
-            <option value="en_reparacion">🟠 En Reparación</option>
-            <option value="de_baja">🔴 De Baja</option>
-          </select>
-        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
+          <Plus size={16} />
+          <span>Agregar Equipo</span>
+        </button>
       </div>
 
-      {/* Lista de Equipos */}
-      {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>Cargando inventario...</div>
-      ) : equipmentList.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-          No se encontraron equipos con los filtros seleccionados.
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '0.85rem' }}>
-          {equipmentList.map(eq => {
-            const Icon = getCategoryIcon(eq.category);
-            const statusConfig = {
-              operativo: { label: 'Operativo', bg: '#ecfdf5', color: '#047857' },
-              mantenimiento_pendiente: { label: 'Req. Mantenimiento', bg: '#fef3c7', color: '#b45309' },
-              en_reparacion: { label: 'En Reparación', bg: '#fee2e2', color: '#dc2626' },
-              de_baja: { label: 'De Baja', bg: '#f1f5f9', color: '#64748b' }
-            };
-            const st = statusConfig[eq.status] || statusConfig.operativo;
+      {/* Buscador Rápido (siempre disponible) */}
+      <div style={{ position: 'relative', marginBottom: '1.25rem' }}>
+        <Search size={16} style={{ position: 'absolute', left: '10px', top: '12px', color: '#94a3b8' }} />
+        <input
+          type="text"
+          className="form-control"
+          placeholder="Buscar equipo por número (ej. PC 05), tag, especificación (i5, 16GB) o aula..."
+          value={searchTerm}
+          onChange={e => {
+            setSearchTerm(e.target.value);
+            if (e.target.value && activeTab === 'areas') {
+              setActiveTab('todos'); // Si busca algo directo, cambiar a vista de resultados
+            }
+          }}
+          style={{ paddingLeft: '2rem' }}
+        />
+      </div>
 
-            return (
-              <div
-                key={eq.id}
-                className="card"
-                style={{ margin: 0, cursor: 'pointer', transition: 'box-shadow 0.15s ease' }}
-                onClick={() => handleOpenDetail(eq.id)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <div style={{ padding: '0.35rem', borderRadius: '6px', background: '#eff6ff', color: '#2563eb' }}>
-                      <Icon size={16} />
+      {/* ========================================================
+          MODO 1: NAVEGACIÓN JERÁRQUICA: ÁREA > SALÓN/LAB > EQUIPOS
+          ======================================================== */}
+      {activeTab === 'areas' && (
+        <div>
+          {/* Breadcrumb de Navegación */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '13px', background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <span
+              style={{ fontWeight: 600, color: '#2563eb', cursor: 'pointer' }}
+              onClick={() => { setSelectedArea(null); setSelectedLocation(null); }}
+            >
+              Inventario
+            </span>
+
+            {selectedArea && (
+              <>
+                <ChevronRight size={14} color="#94a3b8" />
+                <span
+                  style={{ fontWeight: 600, color: selectedLocation ? '#2563eb' : '#0f172a', cursor: selectedLocation ? 'pointer' : 'default' }}
+                  onClick={() => setSelectedLocation(null)}
+                >
+                  {selectedArea}
+                </span>
+              </>
+            )}
+
+            {selectedLocation && (
+              <>
+                <ChevronRight size={14} color="#94a3b8" />
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                  {selectedLocation}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* NIVEL 1: Listar Áreas */}
+          {!selectedArea && (
+            <div>
+              <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '0.75rem' }}>
+                Selecciona un área para ver sus salones y laboratorios:
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
+                {areasList.map(area => (
+                  <div
+                    key={area.id}
+                    className="card"
+                    style={{ margin: 0, cursor: 'pointer', borderLeft: '4px solid #2563eb', transition: 'transform 0.1s ease' }}
+                    onClick={() => setSelectedArea(area.name)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ padding: '0.4rem', borderRadius: '8px', background: '#eff6ff', color: '#2563eb' }}>
+                          <Folder size={20} />
+                        </div>
+                        <strong style={{ fontSize: '16px', color: '#0f172a' }}>{area.name}</strong>
+                      </div>
+                      <ChevronRight size={18} color="#94a3b8" />
                     </div>
-                    <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', letterSpacing: '0.02em' }}>
-                      {eq.code}
-                    </span>
-                  </div>
 
-                  <span style={{
-                    backgroundColor: st.bg,
-                    color: st.color,
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '0.2rem 0.5rem',
-                    borderRadius: '9999px'
-                  }}>
-                    {st.label}
-                  </span>
-                </div>
-
-                <div style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b', marginBottom: '0.25rem' }}>
-                  {eq.name}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '12px', color: '#64748b', marginBottom: '0.4rem' }}>
-                  <MapPin size={12} />
-                  <span>{eq.location}</span>
-                  {eq.brand && <span>• {eq.brand} {eq.model || ''}</span>}
-                </div>
-
-                {eq.specs && (
-                  <div style={{ fontSize: '11px', color: '#475569', background: '#f8fafc', padding: '0.35rem 0.5rem', borderRadius: '4px', marginBottom: '0.5rem', lineHeight: 1.3 }}>
-                    {eq.specs}
-                  </div>
-                )}
-
-                {/* Último servicio */}
-                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.4rem', fontSize: '11px', color: '#64748b' }}>
-                  {eq.last_service_date ? (
-                    <div>
-                      <strong>Último servicio ({eq.last_service_date}):</strong>{' '}
-                      <span>{eq.last_service_summary || 'Revisión'}</span>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '0.5rem' }}>
+                      {area.description || 'Área institucional'}
                     </div>
-                  ) : (
-                    <span style={{ color: '#94a3b8' }}>Sin intervenciones registradas</span>
-                  )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#334155', borderTop: '1px solid #f1f5f9', paddingTop: '0.4rem' }}>
+                      <span><strong>{area.location_count || 0}</strong> salones/labs</span>
+                      <span><strong>{area.equipment_count || 0}</strong> equipos</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* NIVEL 2: Listar Salones / Labs dentro del Área Seleccionada */}
+          {selectedArea && !selectedLocation && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <button className="btn btn-outline btn-sm" onClick={() => setSelectedArea(null)}>
+                  <ArrowLeft size={15} />
+                  <span>Volver a Áreas</span>
+                </button>
+                <div style={{ fontSize: '13px', color: '#64748b' }}>
+                  Salones y laboratorios en <strong>{selectedArea}</strong>:
                 </div>
               </div>
-            );
-          })}
+
+              {locationsInSelectedArea.length === 0 ? (
+                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                  Aún no hay equipos asignados a salones en esta área.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                  {locationsInSelectedArea.map(loc => (
+                    <div
+                      key={loc.location}
+                      className="card"
+                      style={{ margin: 0, cursor: 'pointer', borderLeft: '4px solid #10b981' }}
+                      onClick={() => setSelectedLocation(loc.location)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                          <strong style={{ fontSize: '15px', color: '#0f172a' }}>{loc.location}</strong>
+                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                            {loc.count} equipo(s) instalado(s)
+                          </div>
+                        </div>
+                        <ChevronRight size={18} color="#94a3b8" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* NIVEL 3: Listar Equipos en Salón/Lab Específico (ej. Bachillerato > Lab 1 > PC 01, PC 02...) */}
+          {selectedArea && selectedLocation && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-outline btn-sm" onClick={() => setSelectedLocation(null)}>
+                  <ArrowLeft size={15} />
+                  <span>Volver a Salones de {selectedArea}</span>
+                </button>
+                <div style={{ fontSize: '13px', color: '#64748b' }}>
+                  Equipos en <strong>{selectedArea} › {selectedLocation}</strong> ({equipmentList.length})
+                </div>
+              </div>
+
+              {equipmentList.length === 0 ? (
+                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                  No hay equipos en este espacio.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.85rem' }}>
+                  {equipmentList.map(eq => (
+                    <EquipmentCard key={eq.id} eq={eq} onOpenDetail={handleOpenDetail} getCategoryIcon={getCategoryIcon} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================
+          MODO 2: LISTA GLOBAL COMPLETA CON FILTROS
+          ======================================================== */}
+      {activeTab === 'todos' && (
+        <div>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <select
+              className="form-control"
+              value={filterCategory}
+              onChange={e => setFilterCategory(e.target.value)}
+              style={{ width: 'auto', minWidth: '140px' }}
+            >
+              <option value="">Todos los tipos</option>
+              <option value="pc">PC de Escritorio</option>
+              <option value="laptop">Laptops</option>
+              <option value="proyector">Proyectores</option>
+              <option value="impresora">Impresoras</option>
+              <option value="red">Red / Switches</option>
+              <option value="monitor">Monitores</option>
+              <option value="ups">UPS / Reguladores</option>
+              <option value="otro">Otros</option>
+            </select>
+
+            <select
+              className="form-control"
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              style={{ width: 'auto', minWidth: '140px' }}
+            >
+              <option value="">Cualquier estado</option>
+              <option value="operativo">🟢 Operativo</option>
+              <option value="mantenimiento_pendiente">🟡 Req. Mantenimiento</option>
+              <option value="en_reparacion">🟠 En Reparación</option>
+              <option value="de_baja">🔴 De Baja</option>
+            </select>
+          </div>
+
+          {isLoading ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>Cargando equipos...</div>
+          ) : equipmentList.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+              No se encontraron equipos con los filtros seleccionados.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.85rem' }}>
+              {equipmentList.map(eq => (
+                <EquipmentCard key={eq.id} eq={eq} onOpenDetail={handleOpenDetail} getCategoryIcon={getCategoryIcon} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================
+          MODO 3: GESTIONAR ÁREAS (Para que el usuario agregue áreas)
+          ======================================================== */}
+      {activeTab === 'gestionar_areas' && (
+        <div>
+          {/* Formulario Crear Nueva Área */}
+          <div className="card">
+            <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <FolderPlus size={18} color="#2563eb" />
+              <span>Agregar Nueva Área Institucional</span>
+            </h3>
+            <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '1rem' }}>
+              Define las áreas del colegio para estructurar los salones y laboratorios (ej. *Bachillerato, Primaria, Preescolar, Administración, Biblioteca*).
+            </p>
+
+            <form onSubmit={handleCreateArea} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Nombre del área (ej. Preescolar, Biblioteca)..."
+                  value={areaNameInput}
+                  onChange={e => setAreaNameInput(e.target.value)}
+                  required
+                />
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Descripción opcional (ej. Edificio este, planta baja)..."
+                  value={areaDescInput}
+                  onChange={e => setAreaDescInput(e.target.value)}
+                />
+              </div>
+              <button type="submit" className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} disabled={isCreatingArea}>
+                <Plus size={15} />
+                <span>{isCreatingArea ? 'Creando...' : 'Crear Área'}</span>
+              </button>
+            </form>
+          </div>
+
+          {/* Lista de Áreas Existentes */}
+          <div className="card">
+            <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem' }}>
+              Áreas Registradas ({areasList.length})
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {areasList.map(a => (
+                <div
+                  key={a.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.75rem',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px'
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: '14px', color: '#0f172a' }}>{a.name}</strong>
+                    {a.description && <div style={{ fontSize: '12px', color: '#64748b' }}>{a.description}</div>}
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                      {a.equipment_count || 0} equipos registrados
+                    </div>
+                  </div>
+
+                  {a.name !== 'General' && (
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => handleDeleteArea(a.id)}
+                      style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+                      title="Eliminar área"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -345,7 +613,7 @@ export function InventarioView() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Cpu size={20} color="#2563eb" />
                 <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>
-                  {equipmentDetail ? `Hoja de Vida: ${equipmentDetail.code}` : 'Cargando...'}
+                  {equipmentDetail ? `${equipmentDetail.code}: ${equipmentDetail.unit_number || equipmentDetail.name}` : 'Cargando...'}
                 </span>
               </div>
               <button className="btn btn-outline btn-sm" onClick={() => setSelectedEquipment(null)} style={{ border: 'none' }}>
@@ -362,8 +630,8 @@ export function InventarioView() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{equipmentDetail.name}</h3>
-                      <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-                        📍 <strong>Ubicación:</strong> {equipmentDetail.location} | <strong>Tipo:</strong> {equipmentDetail.category.toUpperCase()}
+                      <div style={{ fontSize: '13px', color: '#475569', marginTop: '2px' }}>
+                        📍 <strong>Jerarquía:</strong> {equipmentDetail.area || 'General'} › {equipmentDetail.location} {equipmentDetail.unit_number ? `(Unidad: ${equipmentDetail.unit_number})` : ''}
                       </div>
                       {equipmentDetail.brand && (
                         <div style={{ fontSize: '13px', color: '#64748b' }}>
@@ -425,7 +693,7 @@ export function InventarioView() {
                       <input
                         type="text"
                         className="form-control"
-                        placeholder="ej. Cambio de pasta térmica, limpieza profunda, cambio de fuente..."
+                        placeholder="ej. Limpieza de polvo, cambio de pasta térmica, actualización..."
                         value={serviceAction}
                         onChange={e => setServiceAction(e.target.value)}
                         style={{ fontSize: '13px' }}
@@ -466,11 +734,6 @@ export function InventarioView() {
                           <div style={{ fontSize: '13px', color: '#334155' }}>
                             {srv.action_taken}
                           </div>
-                          {srv.notes && (
-                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                              Nota: {srv.notes}
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -507,21 +770,69 @@ export function InventarioView() {
               </button>
             </div>
             <form onSubmit={handleCreateEquipment} className="modal-body">
+              {/* Jerarquía: Área > Salón/Lab > Número PC */}
+              <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: '#2563eb', marginBottom: '0.5rem' }}>
+                  Jerarquía de Ubicación: Área › Salón › Número
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Área *</label>
+                    <select
+                      className="form-control"
+                      value={newArea}
+                      onChange={e => setNewArea(e.target.value)}
+                      style={{ fontSize: '12px' }}
+                    >
+                      {areasList.map(a => (
+                        <option key={a.id} value={a.name}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Salón / Lab *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="ej. Lab 1, Aula 3"
+                      value={newLocation}
+                      onChange={e => setNewLocation(e.target.value)}
+                      style={{ fontSize: '12px' }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Número / Unidad *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="ej. PC 01, PC 15"
+                      value={newUnitNumber}
+                      onChange={e => setNewUnitNumber(e.target.value)}
+                      style={{ fontSize: '12px' }}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div className="form-group">
-                  <label className="form-label">Código / Tag *</label>
+                  <label className="form-label">Código / Tag sugerido</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="ej. PC-LAB1-15, PROY-AULA3"
+                    placeholder={handleAutoCode(newArea, newLocation, newUnitNumber)}
                     value={newCode}
                     onChange={e => setNewCode(e.target.value)}
-                    required
                   />
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                    Si se deja vacío: <code>{handleAutoCode(newArea, newLocation, newUnitNumber)}</code>
+                  </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Categoría *</label>
+                  <label className="form-label">Tipo de Equipo *</label>
                   <select
                     className="form-control"
                     value={newCategory}
@@ -539,53 +850,13 @@ export function InventarioView() {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Nombre descriptivo *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="ej. PC Estudiante 15, Proyector Interactivo..."
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Ubicación *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="ej. Laboratorio 1, Salón 4B"
-                    value={newLocation}
-                    onChange={e => setNewLocation(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Estado inicial</label>
-                  <select
-                    className="form-control"
-                    value={newStatus}
-                    onChange={e => setNewStatus(e.target.value)}
-                  >
-                    <option value="operativo">🟢 Operativo</option>
-                    <option value="mantenimiento_pendiente">🟡 Requiere Mantenimiento</option>
-                    <option value="en_reparacion">🟠 En Reparación</option>
-                    <option value="de_baja">🔴 De Baja</option>
-                  </select>
-                </div>
-              </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div className="form-group">
                   <label className="form-label">Marca</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="ej. HP, Dell, Epson..."
+                    placeholder="ej. HP, Dell, Lenovo"
                     value={newBrand}
                     onChange={e => setNewBrand(e.target.value)}
                   />
@@ -596,7 +867,7 @@ export function InventarioView() {
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="ej. ProDesk 600, PowerLite..."
+                    placeholder="ej. ProDesk 600 G3"
                     value={newModel}
                     onChange={e => setNewModel(e.target.value)}
                   />
@@ -608,10 +879,24 @@ export function InventarioView() {
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="ej. Core i5, 16GB RAM, SSD 480GB, Win 11"
+                  placeholder="ej. Core i5-6500, 16GB RAM, SSD 480GB, Windows 11"
                   value={newSpecs}
                   onChange={e => setNewSpecs(e.target.value)}
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Estado inicial</label>
+                <select
+                  className="form-control"
+                  value={newStatus}
+                  onChange={e => setNewStatus(e.target.value)}
+                >
+                  <option value="operativo">🟢 Operativo</option>
+                  <option value="mantenimiento_pendiente">🟡 Requiere Mantenimiento</option>
+                  <option value="en_reparacion">🟠 En Reparación</option>
+                  <option value="de_baja">🔴 De Baja</option>
+                </select>
               </div>
 
               <div className="modal-footer" style={{ padding: '0.5rem 0 0 0' }}>
@@ -626,6 +911,73 @@ export function InventarioView() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Componente Tarjeta de Equipo Reutilizable
+function EquipmentCard({ eq, onOpenDetail, getCategoryIcon }) {
+  const Icon = getCategoryIcon(eq.category);
+  const statusConfig = {
+    operativo: { label: 'Operativo', bg: '#ecfdf5', color: '#047857' },
+    mantenimiento_pendiente: { label: 'Req. Mantenimiento', bg: '#fef3c7', color: '#b45309' },
+    en_reparacion: { label: 'En Reparación', bg: '#fee2e2', color: '#dc2626' },
+    de_baja: { label: 'De Baja', bg: '#f1f5f9', color: '#64748b' }
+  };
+  const st = statusConfig[eq.status] || statusConfig.operativo;
+
+  return (
+    <div
+      className="card"
+      style={{ margin: 0, cursor: 'pointer', transition: 'box-shadow 0.15s ease' }}
+      onClick={() => onOpenDetail(eq.id)}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div style={{ padding: '0.35rem', borderRadius: '6px', background: '#eff6ff', color: '#2563eb' }}>
+            <Icon size={16} />
+          </div>
+          <div>
+            <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>
+              {eq.unit_number ? `${eq.unit_number} (${eq.code})` : eq.code}
+            </span>
+          </div>
+        </div>
+
+        <span style={{
+          backgroundColor: st.bg,
+          color: st.color,
+          fontSize: '11px',
+          fontWeight: 700,
+          padding: '0.2rem 0.5rem',
+          borderRadius: '9999px'
+        }}>
+          {st.label}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '12px', color: '#475569', marginBottom: '0.35rem' }}>
+        <MapPin size={12} color="#2563eb" />
+        <strong>{eq.area || 'General'}</strong> › <span>{eq.location}</span>
+        {eq.brand && <span style={{ color: '#94a3b8' }}>• {eq.brand} {eq.model || ''}</span>}
+      </div>
+
+      {eq.specs && (
+        <div style={{ fontSize: '11px', color: '#334155', background: '#f8fafc', padding: '0.35rem 0.5rem', borderRadius: '4px', marginBottom: '0.4rem', lineHeight: 1.3 }}>
+          {eq.specs}
+        </div>
+      )}
+
+      {/* Último servicio */}
+      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.35rem', fontSize: '11px', color: '#64748b' }}>
+        {eq.last_service_date ? (
+          <div>
+            <strong>Último servicio ({eq.last_service_date}):</strong> {eq.last_service_summary || 'Revisión'}
+          </div>
+        ) : (
+          <span style={{ color: '#94a3b8' }}>Sin intervenciones registradas</span>
+        )}
+      </div>
     </div>
   );
 }

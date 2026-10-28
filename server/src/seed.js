@@ -278,10 +278,12 @@ const sampleEquipment = [
   {
     code: 'PC-LAB1-01',
     name: 'PC Profesor Lab 1',
+    area: 'Bachillerato',
+    location: 'Lab 1',
+    unit_number: 'Docente',
     category: 'pc',
     brand: 'HP',
     model: 'ProDesk 600 G3',
-    location: 'Laboratorio 1',
     specs: 'Intel Core i5-6500 3.2GHz, 16GB DDR4, SSD 480GB Kingston, Windows 11 Pro',
     status: 'operativo',
     last_service_date: '2026-10-20',
@@ -290,10 +292,12 @@ const sampleEquipment = [
   {
     code: 'PC-LAB1-02',
     name: 'PC Alumno Lab 1 - Puesto 02',
+    area: 'Bachillerato',
+    location: 'Lab 1',
+    unit_number: 'PC 02',
     category: 'pc',
     brand: 'Dell',
     model: 'OptiPlex 3050',
-    location: 'Laboratorio 1',
     specs: 'Intel Core i3-7100, 8GB DDR4, SSD 240GB, Windows 10',
     status: 'operativo',
     last_service_date: '2026-10-20',
@@ -302,10 +306,12 @@ const sampleEquipment = [
   {
     code: 'PC-LAB1-03',
     name: 'PC Alumno Lab 1 - Puesto 03',
+    area: 'Bachillerato',
+    location: 'Lab 1',
+    unit_number: 'PC 03',
     category: 'pc',
     brand: 'Dell',
     model: 'OptiPlex 3050',
-    location: 'Laboratorio 1',
     specs: 'Intel Core i3-7100, 8GB DDR4, HDD 500GB, Windows 10',
     status: 'mantenimiento_pendiente',
     last_service_date: '2026-08-15',
@@ -314,10 +320,12 @@ const sampleEquipment = [
   {
     code: 'PROY-LAB2',
     name: 'Proyector Interactivo Lab 2',
+    area: 'Bachillerato',
+    location: 'Lab 2',
+    unit_number: 'Proyector',
     category: 'proyector',
     brand: 'Epson',
     model: 'PowerLite X39',
-    location: 'Laboratorio 2',
     specs: '3500 lúmenes, HDMI/VGA, Lámpara 240W',
     status: 'operativo',
     last_service_date: '2026-10-25',
@@ -326,10 +334,12 @@ const sampleEquipment = [
   {
     code: 'IMP-SALAPROF',
     name: 'Impresora Sala de Profesores',
+    area: 'Primaria',
+    location: 'Sala de Profesores',
+    unit_number: 'IMP 01',
     category: 'impresora',
     brand: 'HP',
     model: 'LaserJet P1102w',
-    location: 'Sala de Profesores',
     specs: 'Monocromática, Tóner CE285A (85A), USB y WiFi',
     status: 'operativo',
     last_service_date: '2026-10-26',
@@ -338,10 +348,12 @@ const sampleEquipment = [
   {
     code: 'PC-SEC-01',
     name: 'PC Secretaria Principal',
+    area: 'Administración',
+    location: 'Secretaría',
+    unit_number: 'PC 01',
     category: 'pc',
     brand: 'Lenovo',
     model: 'ThinkCentre M720s',
-    location: 'Secretaría',
     specs: 'Intel Core i5-8400, 8GB RAM, SSD 256GB, Windows 11',
     status: 'en_reparacion',
     last_service_date: '2026-10-24',
@@ -350,10 +362,12 @@ const sampleEquipment = [
   {
     code: 'SW-LAB1',
     name: 'Switch de Red Lab 1',
+    area: 'Bachillerato',
+    location: 'Lab 1',
+    unit_number: 'Switch 01',
     category: 'red',
     brand: 'TP-Link',
     model: 'TL-SG1016D Gigabit',
-    location: 'Laboratorio 1',
     specs: '16 puertos Gigabit 10/100/1000 Mbps',
     status: 'mantenimiento_pendiente',
     last_service_date: '2026-09-10',
@@ -362,10 +376,12 @@ const sampleEquipment = [
   {
     code: 'ROUTER-PPAL',
     name: 'Router Principal Mikrotik',
+    area: 'General',
+    location: 'Servidor Central',
+    unit_number: 'Router 01',
     category: 'red',
     brand: 'MikroTik',
     model: 'RB750Gr3 (hEX)',
-    location: 'Servidor Central',
     specs: 'Dual Core 880MHz, 256MB RAM, 5 puertos GbE, RouterOS v7',
     status: 'operativo',
     last_service_date: '2026-10-05',
@@ -375,8 +391,8 @@ const sampleEquipment = [
 
 const insertEquipStmt = db.prepare(`
   INSERT INTO inventory (
-    code, name, category, brand, model, location, specs, status, last_service_date, last_service_summary
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    code, name, area, location, unit_number, category, brand, model, specs, status, last_service_date, last_service_summary
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 const insertServiceStmt = db.prepare(`
@@ -389,10 +405,12 @@ for (const eq of sampleEquipment) {
   const r = insertEquipStmt.run(
     eq.code,
     eq.name,
+    eq.area || 'General',
+    eq.location,
+    eq.unit_number || null,
     eq.category,
     eq.brand,
     eq.model,
-    eq.location,
     eq.specs,
     eq.status,
     eq.last_service_date,

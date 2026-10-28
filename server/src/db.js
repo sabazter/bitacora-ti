@@ -114,15 +114,25 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
     CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at);
 
+    -- Áreas del colegio definidas por el usuario (ej. Bachillerato, Primaria, Administración, etc.)
+    CREATE TABLE IF NOT EXISTS inventory_areas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+    );
+
     -- Inventario de equipos del colegio
     CREATE TABLE IF NOT EXISTS inventory (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       code TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
+      area TEXT DEFAULT 'General',
+      location TEXT NOT NULL,
+      unit_number TEXT,
       category TEXT CHECK(category IN ('pc', 'laptop', 'proyector', 'impresora', 'red', 'monitor', 'ups', 'otro')) DEFAULT 'pc',
       brand TEXT,
       model TEXT,
-      location TEXT NOT NULL,
       specs TEXT,
       status TEXT CHECK(status IN ('operativo', 'mantenimiento_pendiente', 'en_reparacion', 'de_baja')) DEFAULT 'operativo',
       last_service_date TEXT,
@@ -173,6 +183,34 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_weekly_reports_week_code ON weekly_reports(week_code);
     CREATE INDEX IF NOT EXISTS idx_weekly_reports_start_date ON weekly_reports(start_date);
   `);
+
+  // Migraciones seguras para columnas de área y número de unidad
+  try {
+    const columns = db.prepare("PRAGMA table_info(inventory)").all().map(c => c.name);
+    if (!columns.includes('area')) {
+      db.exec("ALTER TABLE inventory ADD COLUMN area TEXT DEFAULT 'General';");
+    }
+    if (!columns.includes('unit_number')) {
+      db.exec("ALTER TABLE inventory ADD COLUMN unit_number TEXT;");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_inventory_area ON inventory(area);");
+  } catch (e) {
+    // Si la tabla es recién creada ya las tiene
+  }
+
+  // Insertar áreas iniciales por defecto si la tabla está vacía
+  try {
+    const areaCount = db.prepare("SELECT COUNT(*) as count FROM inventory_areas").get()?.count || 0;
+    if (areaCount === 0) {
+      const insertArea = db.prepare("INSERT OR IGNORE INTO inventory_areas (name, description) VALUES (?, ?)");
+      insertArea.run('Bachillerato', 'Aulas y laboratorios de educación media y diversificada');
+      insertArea.run('Primaria', 'Aulas de educación básica y salones de profesores');
+      insertArea.run('Administración', 'Secretaría, coordinación, rectoría y oficinas administrativas');
+      insertArea.run('General', 'Áreas comunes, depósitos y servidores');
+    }
+  } catch (e) {
+    // ignorar
+  }
 }
 
 // Helpers para consultar y actualizar settings

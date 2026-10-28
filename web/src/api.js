@@ -117,8 +117,12 @@ export const api = {
 
   // Inventario
   getInventoryStats: () => request('/api/inventory/stats'),
+  getInventoryAreas: () => request('/api/inventory/areas'),
+  createInventoryArea: data => request('/api/inventory/areas', { method: 'POST', body: JSON.stringify(data) }),
+  deleteInventoryArea: id => request(`/api/inventory/areas/${id}`, { method: 'DELETE' }),
   getInventory: (params = {}) => {
     const query = new URLSearchParams();
+    if (params.area) query.set('area', params.area);
     if (params.category) query.set('category', params.category);
     if (params.location) query.set('location', params.location);
     if (params.status) query.set('status', params.status);

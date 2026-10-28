@@ -6,6 +6,64 @@ const router = express.Router();
 const VALID_CATEGORIES = ['pc', 'laptop', 'proyector', 'impresora', 'red', 'monitor', 'ups', 'otro'];
 const VALID_STATUSES = ['operativo', 'mantenimiento_pendiente', 'en_reparacion', 'de_baja'];
 
+// ==========================================
+// GESTIÓN DE ÁREAS (Inventario > Área > Ubicación > Equipo)
+// ==========================================
+
+// GET /api/inventory/areas (Listar áreas con conteo de equipos)
+router.get('/areas', (req, res) => {
+  const db = getDb();
+  const areas = db.prepare(`
+    SELECT a.*, 
+      (SELECT COUNT(*) FROM inventory i WHERE i.area = a.name) as equipment_count,
+      (SELECT COUNT(DISTINCT location) FROM inventory i WHERE i.area = a.name) as location_count
+    FROM inventory_areas a
+    ORDER BY a.name ASC
+  `).all();
+  res.json(areas);
+});
+
+// POST /api/inventory/areas (Crear nueva área)
+router.post('/areas', (req, res) => {
+  const db = getDb();
+  const { name, description } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'El nombre del área es obligatorio (ej. Bachillerato, Primaria).' });
+  }
+
+  const existing = db.prepare('SELECT id FROM inventory_areas WHERE lower(name) = lower(?)').get(name.trim());
+  if (existing) {
+    return res.status(400).json({ error: `Ya existe un área con el nombre "${name.trim()}".` });
+  }
+
+  const insert = db.prepare('INSERT INTO inventory_areas (name, description) VALUES (?, ?)');
+  const r = insert.run(name.trim(), description ? description.trim() : null);
+  const created = db.prepare('SELECT * FROM inventory_areas WHERE id = ?').get(Number(r.lastInsertRowid));
+
+  res.status(201).json(created);
+});
+
+// DELETE /api/inventory/areas/:id (Eliminar área y reasignar equipos a 'General')
+router.delete('/areas/:id', (req, res) => {
+  const db = getDb();
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'ID inválido.' });
+
+  const area = db.prepare('SELECT * FROM inventory_areas WHERE id = ?').get(id);
+  if (!area) return res.status(404).json({ error: 'Área no encontrada.' });
+
+  if (area.name === 'General') {
+    return res.status(400).json({ error: 'El área General no puede ser eliminada.' });
+  }
+
+  // Reasignar equipos a 'General'
+  db.prepare("UPDATE inventory SET area = 'General' WHERE area = ?").run(area.name);
+  db.prepare('DELETE FROM inventory_areas WHERE id = ?').run(id);
+
+  res.json({ success: true, message: `Área "${area.name}" eliminada. Equipos reasignados a General.` });
+});
+
 // GET /api/inventory/stats (Estadísticas y resumen de equipos)
 router.get('/stats', (req, res) => {
   const db = getDb();
@@ -16,6 +74,13 @@ router.get('/stats', (req, res) => {
   const enReparacion = db.prepare("SELECT COUNT(*) as count FROM inventory WHERE status = 'en_reparacion'").get().count;
   const deBaja = db.prepare("SELECT COUNT(*) as count FROM inventory WHERE status = 'de_baja'").get().count;
 
+  const byArea = db.prepare(`
+    SELECT area, COUNT(*) as count
+    FROM inventory
+    GROUP BY area
+    ORDER BY count DESC
+  `).all();
+
   const byCategory = db.prepare(`
     SELECT category, COUNT(*) as count
     FROM inventory
@@ -24,10 +89,10 @@ router.get('/stats', (req, res) => {
   `).all();
 
   const byLocation = db.prepare(`
-    SELECT location, COUNT(*) as count
+    SELECT area, location, COUNT(*) as count
     FROM inventory
-    GROUP BY location
-    ORDER BY count DESC
+    GROUP BY area, location
+    ORDER BY area ASC, location ASC
   `).all();
 
   res.json({
@@ -36,6 +101,7 @@ router.get('/stats', (req, res) => {
     mantenimiento,
     enReparacion,
     deBaja,
+    byArea,
     byCategory,
     byLocation
   });
@@ -44,11 +110,15 @@ router.get('/stats', (req, res) => {
 // GET /api/inventory (Lista de equipos con filtros y búsqueda)
 router.get('/', (req, res) => {
   const db = getDb();
-  const { category, location, status, q } = req.query;
+  const { area, category, location, status, q } = req.query;
 
   let query = 'SELECT * FROM inventory WHERE 1=1';
   const params = [];
 
+  if (area) {
+    query += ' AND area = ?';
+    params.push(area);
+  }
   if (category) {
     query += ' AND category = ?';
     params.push(category);
@@ -62,12 +132,12 @@ router.get('/', (req, res) => {
     params.push(status);
   }
   if (q) {
-    query += ' AND (code LIKE ? OR name LIKE ? OR brand LIKE ? OR model LIKE ? OR location LIKE ? OR specs LIKE ?)';
+    query += ' AND (code LIKE ? OR name LIKE ? OR brand LIKE ? OR model LIKE ? OR area LIKE ? OR location LIKE ? OR unit_number LIKE ? OR specs LIKE ?)';
     const term = `%${q}%`;
-    params.push(term, term, term, term, term, term);
+    params.push(term, term, term, term, term, term, term, term);
   }
 
-  query += ' ORDER BY location ASC, code ASC';
+  query += ' ORDER BY area ASC, location ASC, unit_number ASC, code ASC';
 
   const rows = db.prepare(query).all(...params);
   res.json(rows);
@@ -79,10 +149,12 @@ router.post('/', (req, res) => {
   const {
     code,
     name,
+    area = 'General',
+    location,
+    unit_number,
     category = 'pc',
     brand,
     model,
-    location,
     specs,
     status = 'operativo',
     notes
@@ -95,11 +167,15 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'El nombre del equipo es obligatorio.' });
   }
   if (!location || !location.trim()) {
-    return res.status(400).json({ error: 'La ubicación es obligatoria.' });
+    return res.status(400).json({ error: 'La ubicación o salón es obligatorio (ej. Lab 1, Aula 3).' });
   }
 
   const cleanCategory = VALID_CATEGORIES.includes(category) ? category : 'pc';
   const cleanStatus = VALID_STATUSES.includes(status) ? status : 'operativo';
+  const cleanArea = area ? area.trim() : 'General';
+
+  // Asegurar que el área exista en inventory_areas
+  db.prepare('INSERT OR IGNORE INTO inventory_areas (name) VALUES (?)').run(cleanArea);
 
   // Verificar código único
   const existing = db.prepare('SELECT id FROM inventory WHERE code = ?').get(code.trim().toUpperCase());
@@ -109,17 +185,19 @@ router.post('/', (req, res) => {
 
   const insertStmt = db.prepare(`
     INSERT INTO inventory (
-      code, name, category, brand, model, location, specs, status, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      code, name, area, location, unit_number, category, brand, model, specs, status, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = insertStmt.run(
     code.trim().toUpperCase(),
     name.trim(),
+    cleanArea,
+    location.trim(),
+    unit_number ? unit_number.trim() : null,
     cleanCategory,
     brand ? brand.trim() : null,
     model ? model.trim() : null,
-    location.trim(),
     specs ? specs.trim() : null,
     cleanStatus,
     notes ? notes.trim() : null
@@ -164,8 +242,12 @@ router.patch('/:id', (req, res) => {
   const current = db.prepare('SELECT * FROM inventory WHERE id = ?').get(id);
   if (!current) return res.status(404).json({ error: 'Equipo no encontrado.' });
 
-  const allowedFields = ['name', 'category', 'brand', 'model', 'location', 'specs', 'status', 'notes'];
+  const allowedFields = ['name', 'category', 'brand', 'model', 'area', 'location', 'unit_number', 'specs', 'status', 'notes'];
   const updates = { ...req.body };
+
+  if (updates.area && updates.area.trim()) {
+    db.prepare('INSERT OR IGNORE INTO inventory_areas (name) VALUES (?)').run(updates.area.trim());
+  }
 
   if (updates.code && updates.code.trim().toUpperCase() !== current.code) {
     const existing = db.prepare('SELECT id FROM inventory WHERE code = ? AND id != ?').get(updates.code.trim().toUpperCase(), id);

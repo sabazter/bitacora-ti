@@ -69,11 +69,21 @@
   - Selección de nombre, aula/ubicación, tipo (*Falla, Material, Mejora tipo "cables con tierap", Sugerencia*), descripción y foto opcional con compresión en navegador.
   - Visualización pública del estado de peticiones para que los docentes sepan cuándo fue atendida su solicitud.
   - Bandeja para Santiago con botón de conversión a Tarea de Kanban con 1 clic.
-- **Inventario y Hoja de Vida de Equipos:**
-  - Registro de equipos por código único, tipo, marca, modelo, ubicación, specs y estado.
-  - Hoja de vida con historial cronológico de todas las intervenciones técnicas y mantenimientos.
-  - Buscador instantáneo optimizado para más de 150 equipos.
-  - Resumen estadístico (total, operativos, mantenimiento pendiente, en reparación).
+- **Inventario Jerárquico (~150 Equipos):**
+  - Estructura organizada: **Inventario > Área (Bachillerato, Primaria, etc.) > Salón/Lab (Lab 1) > Equipo (PC 01)**.
+  - Gestión de áreas personalizadas: el usuario puede añadir o gestionar áreas del colegio.
+  - Hojas de vida por equipo con historial cronológico de todas las intervenciones técnicas y mantenimientos.
+  - Resumen estadístico interactivo con badges de estado (operativo, mantenimiento, en reparación, de baja).
+
+### Fase 8 — Reportes Ejecutivos Semanales para Supervisores (Viernes)
+- Botón en vista Reportes: "Generar Reporte de esta Semana".
+- Cumple con los 4 bloques clave para la directiva:
+  1. 🚨 **Problemas y Fallas Ocurridas**
+  2. 🛠️ **Equipos y Tareas Reparadas / Completadas**
+  3. ⏳ **En lo que se está Trabajando Actualmente**
+  4. 📋 **Trabajos y Solicitudes Pendientes para la Próxima Semana**
+- Almacenamiento histórico en la base de datos (`weekly_reports`).
+- Botón de descarga/impresión directa en PDF con membrete institucional.
 
 ---
 
@@ -86,29 +96,22 @@
 | Rate limiting de login | ✅ Pass | Bloquea a los 5 intentos fallidos consecutivos |
 | Inicio de sesión seguro | ✅ Pass | Entrega cookie `httpOnly` firmada |
 | Verificación `/api/me` | ✅ Pass | Reconoce la sesión activa de Santiago |
+| Consulta de tareas `/api/tasks` | ✅ Pass | Retorna lista completa de tareas autenticadas |
 | Validación de motivos | ✅ Pass | Exige motivo al pasar a `waiting`, `suspendida` o `no_realizada` |
-| Transición automática | ✅ Pass | Marca tarea `todo` a `doing` al registrarla en una sesión |
 | Auditoría `task_events` | ✅ Pass | Registra cambios de estado y notas en el historial |
+| Transición automática | ✅ Pass | Marca tarea `todo` a `doing` al registrarla en una sesión |
 | Cálculo de horas reporte | ✅ Pass | Excluye suspendidas de asignadas; suma reales cumplidas |
-| Generador texto WhatsApp | ✅ Pass | Coincide con la estructura solicitada en la especificación |
+| Generador texto WhatsApp | ✅ Pass | Coincide con la estructura solicitada en la bitácora |
 | Anti Path-Traversal | ✅ Pass | Impide acceso a archivos fuera del directorio de uploads |
 | Servicio estático Express | ✅ Pass | Sirve la app compilada de React en la raíz `/` |
 | Portal solicitudes público | ✅ Pass | Profesores envían y consultan solicitudes sin login |
 | Conversión a tarea | ✅ Pass | Convierte solicitud en tarea de Kanban con 1 clic |
+| Jerarquía y áreas de inventario | ✅ Pass | Gestión de áreas y filtrado por jerarquía Área > Salón > Unidad |
 | Hoja de vida inventario | ✅ Pass | Registra intervenciones y actualiza último servicio |
-| Estadísticas inventario | ✅ Pass | Computa equipos por estado y categoría |
-| Compilación Vite | ✅ Pass | Build limpio en 2.34 segundos |
-| Carga de Seed (`npm run seed`) | ✅ Pass | Carga tareas, sesiones, inventario y solicitudes |
-| Verificación `/api/me` | ✅ Pass | Reconoce la sesión activa de Santiago |
-| Validación de motivos | ✅ Pass | Exige motivo al pasar a `waiting`, `suspendida` o `no_realizada` |
-| Transición automática | ✅ Pass | Marca tarea `todo` a `doing` al registrarla en una sesión |
-| Auditoría `task_events` | ✅ Pass | Registra cambios de estado y notas en el historial |
-| Cálculo de horas reporte | ✅ Pass | Excluye suspendidas de asignadas; suma reales cumplidas |
-| Generador texto WhatsApp | ✅ Pass | Coincide con la estructura solicitada en la especificación |
-| Anti Path-Traversal | ✅ Pass | Impide acceso a archivos fuera del directorio de uploads |
-| Servicio estático Express | ✅ Pass | Sirve la app compilada de React en la raíz `/` |
-| Compilación Vite | ✅ Pass | Build en 2.65 segundos (64 kB gzipped) |
-| Carga de Seed (`npm run seed`) | ✅ Pass | Genera 10 sesiones, 11 tareas y evidencia fotográfica |
+| Estadísticas inventario | ✅ Pass | Computa equipos por estado, categoría y área |
+| Reportes Semanales Viernes | ✅ Pass | Genera, archiva y consulta reportes ejecutivos para supervisores |
+| Compilación Vite | ✅ Pass | Build limpio en 2.29 segundos (76 kB gzipped) |
+| Carga de Seed (`npm run seed`) | ✅ Pass | Genera sesiones, 11 tareas, 8 equipos jerárquicos y 4 solicitudes |
 
 ---
 
