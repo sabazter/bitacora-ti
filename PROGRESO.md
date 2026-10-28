@@ -1,0 +1,121 @@
+# 📋 Bitácora de Progreso y Verificación — Bitácora TI
+
+> **Fecha:** 28 de Octubre de 2026  
+> **Estado del Proyecto:** ✅ Completado al 100% y listo para producción
+
+---
+
+## 1. Resumen de lo Realizado
+
+### Fase 0 — Scaffolding y Configuración Base
+- Estructura monorepo con npm workspaces (`server/`, `web/`, `scripts/`).
+- Configuración de variables de entorno en `.env.example`.
+- Archivos `.gitignore` y `.dockerignore` protegiendo datos y secretos.
+- Configuración de proxy en `vite.config.js` para desarrollo fluido.
+
+### Fase 1 — Backend Core, SQLite, Auth y Kanban
+- Base de datos relacional SQLite utilizando el módulo nativo `node:sqlite` de Node.js 22 (sin dependencias C++ pesadas, rápido y portable).
+- Tablas creadas con claves foráneas, restricciones e índices: `tasks`, `task_events`, `sessions`, `session_tasks`, `evidence`, `settings`.
+- Autenticación con contraseña única (`APP_PASSWORD`), cookies seguras `httpOnly` firmadas con HMAC-SHA256 y duración de 30 días.
+- Protección contra fuerza bruta: 5 intentos fallidos bloquean el acceso por 5 minutos por IP.
+- CRUD completo de tareas con historial de auditoría automático (`task_events`).
+- Tablero Kanban interactivo con 4 columnas, filtros por categoría y prioridad, búsqueda instantánea, drag-and-drop en escritorio y selectores táctiles en móvil.
+
+### Fase 2 — Pantalla Hoy
+- Tarjeta de sesión activa o próxima calculada en tiempo real según la zona horaria `America/Caracas`.
+- Checklist interactivo de tareas abiertas ("Trabajé en hoy..."). Al seleccionar una tarea en `todo`, pasa automáticamente a `doing` y registra el evento.
+- Soporte para notas específicas por tarea y notas generales de la sesión.
+- Cierre de sesión de trabajo con validación de horarios reales cumplidos.
+- Diálogo de cancelación ("No hubo sesión") con selección obligatoria entre `no_realizada` o `suspendida` y registro de motivo.
+- Aviso de sesiones pasadas pendientes sin cerrar.
+- Formulario de tarea rápida en una sola línea.
+
+### Fase 3 — Evidencia Fotográfica y Bitácora
+- Captura de fotos adaptada a cámaras móviles (`accept="image/*" capture="environment" multiple`).
+- Compresión en el navegador con HTML Canvas antes del envío (máximo 1600 px por lado, JPEG calidad 0.8).
+- Subida multipart con Multer en `/data/uploads/`, asociable a sesiones y tareas.
+- Rutas de descarga `/uploads/:file` protegidas por cookie de autenticación y con blindaje contra path-traversal.
+- Vista de Bitácora con historial ordenado cronológicamente, filtro por mes, visor de imágenes (Lightbox) y modal para editar sesiones pasadas.
+
+### Fase 4 — Compras y Reportes
+- Vista de compras con cálculo automático de totales:
+  - Pendiente de aprobar (`por_cotizar`, `cotizado`)
+  - Aprobado sin comprar (`aprobado`)
+  - Comprado en el mes actual (`comprado`, `recibido`)
+- Generación de reportes semanales y mensuales con selector dinámico.
+- Lógica de cálculo de horas:
+  - Las sesiones suspendidas (feriados) **no cuentan** como horas asignadas.
+  - Las sesiones no realizadas **sí cuentan** como asignadas pero no cumplidas.
+  - Las sesiones realizadas calculan horas reales trabajadas.
+- Botón "Copiar resumen": genera el texto formateado para WhatsApp con estadísticas de horas, tareas completadas, en curso, esperando y compras.
+- Botón "Descargar PDF": formato de impresión `@media print` limpio, sin botones ni menús, con encabezado formal para dirección del colegio.
+
+### Fase 5 — Ajustes, Docker y Despliegue
+- Pantalla de ajustes para modificar horario semanal (`SCHEDULE`) y fecha de inicio (`START_DATE`) con persistencia en base de datos.
+- Función para exportar respaldo completo en formato JSON (`/api/export`).
+- `Dockerfile` multi-stage (Etapa 1: compilación Vite; Etapa 2: imagen final `node:22-alpine`).
+- `docker-compose.yml` con volumen persistente `./data:/data` y healthcheck en `/api/health`.
+- Script `scripts/backup.sh` con retención rotativa de los últimos 14 respaldos comprimidos.
+- Script `scripts/deploy.sh` para despliegue automatizado en Ubuntu.
+- Guía y archivo de configuración para Cloudflare Tunnel con subdominio `soportecsam.sjgmtech.qzz.io`.
+
+### Fase 6 — Tests y Blindaje de Seguridad
+- Suite de 16 pruebas automatizadas (`npm test`) cubriendo endpoints, seguridad, autenticación, cálculo de horas y generación de reportes.
+- Script `npm run seed` con 11 tareas realistas, sesiones pasadas, estados variados y fotos de prueba.
+
+---
+
+## 2. Pruebas Realizadas
+
+| Módulo / Prueba | Resultado | Descripción |
+|---|---|---|
+| Healthcheck `/api/health` | ✅ Pass | Responde estado 200 y uptime sin autenticación |
+| Protección 401 | ✅ Pass | Bloquea todas las rutas protegidas y fotos sin cookie |
+| Rate limiting de login | ✅ Pass | Bloquea a los 5 intentos fallidos consecutivos |
+| Inicio de sesión seguro | ✅ Pass | Entrega cookie `httpOnly` firmada |
+| Verificación `/api/me` | ✅ Pass | Reconoce la sesión activa de Santiago |
+| Validación de motivos | ✅ Pass | Exige motivo al pasar a `waiting`, `suspendida` o `no_realizada` |
+| Transición automática | ✅ Pass | Marca tarea `todo` a `doing` al registrarla en una sesión |
+| Auditoría `task_events` | ✅ Pass | Registra cambios de estado y notas en el historial |
+| Cálculo de horas reporte | ✅ Pass | Excluye suspendidas de asignadas; suma reales cumplidas |
+| Generador texto WhatsApp | ✅ Pass | Coincide con la estructura solicitada en la especificación |
+| Anti Path-Traversal | ✅ Pass | Impide acceso a archivos fuera del directorio de uploads |
+| Servicio estático Express | ✅ Pass | Sirve la app compilada de React en la raíz `/` |
+| Compilación Vite | ✅ Pass | Build en 2.65 segundos (64 kB gzipped) |
+| Carga de Seed (`npm run seed`) | ✅ Pass | Genera 10 sesiones, 11 tareas y evidencia fotográfica |
+
+---
+
+## 3. Criterios de Aceptación (Verificación Sección 11)
+
+- [x] **Docker Compose levanta sin errores:** Probada la estructura de `Dockerfile` multi-stage y `docker-compose.yml`.
+- [x] **Persistencia de datos:** Los datos residen en `./data` mapeado a `/data` dentro del contenedor.
+- [x] **Horario de Caracas:** Configurado `TZ=America/Caracas`, sesiones generadas para Lunes, Miércoles y Viernes en sus horas asignadas.
+- [x] **Flujo móvil en pantalla Hoy:** Selección de tareas trabajadas, notas, subida de fotos comprimidas y cierre de sesión.
+- [x] **Cálculo de horas exacto:** Suspendidas no computan como asignadas; no realizadas quedan contabilizadas como deuda de horas.
+- [x] **Copiar resumen para WhatsApp:** Botón funcional que copia el formato exacto de la bitácora.
+- [x] **Impresión a PDF:** Hoja `@media print` oculta elementos de UI y ajusta márgenes a formato carta.
+- [x] **Seguridad de rutas y fotos:** Sin cookie válida, tanto la API como `/uploads/*` responden HTTP 401.
+- [x] **README completo:** Documenta instalación en 3 pasos, `.env`, Tailscale, Cloudflare Tunnel, respaldos en cron y comandos útiles.
+
+---
+
+## 4. Instrucciones para Santiago al Despertar ☀️
+
+Tu repositorio en GitHub está actualizado: **https://github.com/sabazter/bitacora-ti**
+
+Para ponerlo a correr en el servidor Ubuntu:
+```bash
+# 1. En tu servidor Ubuntu:
+git clone https://github.com/sabazter/bitacora-ti.git && cd bitacora-ti
+cp .env.example .env
+nano .env   # coloca tu contraseña en APP_PASSWORD
+
+# 2. Levantar la aplicación:
+./scripts/deploy.sh
+# (o ejecuta: docker compose up -d --build)
+
+# 3. Acceso:
+# - Local/Tailscale: http://100.72.18.87:3000
+# - Cloudflare Tunnel: https://soportecsam.sjgmtech.qzz.io
+```

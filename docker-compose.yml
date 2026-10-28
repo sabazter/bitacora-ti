@@ -1,0 +1,20 @@
+services:
+  bitacora:
+    build: .
+    container_name: bitacora-ti
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/data
+      - TZ=America/Caracas
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

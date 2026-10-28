@@ -1,0 +1,33 @@
+# ==============================================================================
+# Configuración para Cloudflare Tunnel (cloudflared)
+# Dominio base: sjgmtech.qzz.io
+# Subdominio asignado: soportecsam.sjgmtech.qzz.io
+# ==============================================================================
+
+# Si usas el archivo de configuración local de cloudflared (ej. /etc/cloudflared/config.yml):
+# Agrega esta regla dentro del bloque 'ingress:' antes de la regla catch-all (http_status: 404):
+
+ingress:
+  # Regla para Bitácora TI:
+  - hostname: soportecsam.sjgmtech.qzz.io
+    service: http://100.72.18.87:3000
+    # O si cloudflared corre en el mismo host:
+    # service: http://localhost:3000
+    # O si corre dentro de la misma red Docker:
+    # service: http://bitacora-ti:3000
+
+  # Regla 404 final requerida por cloudflared:
+  - service: http_status:404
+
+# ==============================================================================
+# Si administras el túnel desde el Dashboard de Cloudflare (Zero Trust):
+# 1. Ve a: Zero Trust > Networks > Tunnels > Selecciona tu túnel activo
+# 2. Haz clic en "Configure" > Pestaña "Public Hostname"
+# 3. Haz clic en "Add a public hostname"
+# 4. Configura:
+#    - Subdomain: soportecsam
+#    - Domain:    sjgmtech.qzz.io
+#    - Type:      HTTP
+#    - URL:       localhost:3000 (o 100.72.18.87:3000)
+# 5. Guarda y ¡listo! Tendrás HTTPS automático con certificado SSL de Cloudflare.
+# ==============================================================================
