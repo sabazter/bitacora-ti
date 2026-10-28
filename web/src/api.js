@@ -93,5 +93,39 @@ export const api = {
   // Settings & Export
   getSettings: () => request('/api/settings'),
   updateSettings: data => request('/api/settings', { method: 'PUT', body: JSON.stringify(data) }),
-  exportBackupUrl: '/api/export'
+  exportBackupUrl: '/api/export',
+
+  // Solicitudes Públicas (Profesores)
+  submitPublicRequest: formData => request('/api/public/requests', { method: 'POST', body: formData }),
+  getPublicRequests: () => request('/api/public/requests'),
+
+  // Solicitudes Privadas (Santiago)
+  getRequests: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.type) query.set('type', params.type);
+    if (params.q) query.set('q', params.q);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/api/requests${qs}`);
+  },
+  updateRequest: (id, data) => request(`/api/requests/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  convertRequestToTask: id => request(`/api/requests/${id}/convert-to-task`, { method: 'POST' }),
+  deleteRequest: id => request(`/api/requests/${id}`, { method: 'DELETE' }),
+
+  // Inventario
+  getInventoryStats: () => request('/api/inventory/stats'),
+  getInventory: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.category) query.set('category', params.category);
+    if (params.location) query.set('location', params.location);
+    if (params.status) query.set('status', params.status);
+    if (params.q) query.set('q', params.q);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/api/inventory${qs}`);
+  },
+  getEquipment: id => request(`/api/inventory/${id}`),
+  createEquipment: data => request('/api/inventory', { method: 'POST', body: JSON.stringify(data) }),
+  updateEquipment: (id, data) => request(`/api/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteEquipment: id => request(`/api/inventory/${id}`, { method: 'DELETE' }),
+  addEquipmentService: (id, data) => request(`/api/inventory/${id}/services`, { method: 'POST', body: JSON.stringify(data) })
 };

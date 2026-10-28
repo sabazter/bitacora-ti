@@ -8,6 +8,8 @@ export function Header({ activeTab }) {
   const tabTitles = {
     hoy: 'Sesión de Hoy',
     tablero: 'Tablero de Tareas',
+    solicitudes: 'Solicitudes de Profesores',
+    inventario: 'Inventario de Equipos (~150)',
     compras: 'Gestión de Compras',
     bitacora: 'Historial de Bitácora',
     reportes: 'Reportes de Servicio',

@@ -17,6 +17,8 @@ import sessionRoutes from './routes/sessionRoutes.js';
 import evidenceRoutes, { serveUploadsProtected } from './routes/evidenceRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
+import { publicRequestRouter, adminRequestRouter } from './routes/requestRoutes.js';
+import inventoryRoutes from './routes/inventoryRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,6 +78,9 @@ app.get('/api/health', (req, res) => {
 // Rutas de autenticación (login es público, logout y me verifican)
 app.use('/api', authRoutes);
 
+// Ruta pública de solicitudes para profesores (sin login)
+app.use('/api/public/requests', publicRequestRouter);
+
 // Servir archivos de subida protegidos por cookie
 serveUploadsProtected(app);
 
@@ -85,6 +90,8 @@ app.use('/api/sessions', requireAuth, sessionRoutes);
 app.use('/api/evidence', requireAuth, evidenceRoutes);
 app.use('/api/reports', requireAuth, reportRoutes);
 app.use('/api/settings', requireAuth, settingsRoutes);
+app.use('/api/requests', requireAuth, adminRequestRouter);
+app.use('/api/inventory', requireAuth, inventoryRoutes);
 app.use('/api', requireAuth, settingsRoutes); // Para /api/export
 
 // Servir frontend compilado de React (en producción o cuando dist exista)

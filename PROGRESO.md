@@ -60,8 +60,20 @@
 - Guía y archivo de configuración para Cloudflare Tunnel con subdominio `soportecsam.sjgmtech.qzz.io`.
 
 ### Fase 6 — Tests y Blindaje de Seguridad
-- Suite de 16 pruebas automatizadas (`npm test`) cubriendo endpoints, seguridad, autenticación, cálculo de horas y generación de reportes.
-- Script `npm run seed` con 11 tareas realistas, sesiones pasadas, estados variados y fotos de prueba.
+- Suite de 18 pruebas automatizadas (`npm test`) cubriendo endpoints, seguridad, autenticación, cálculo de horas, generación de reportes, solicitudes públicas e inventario.
+- Script `npm run seed` con 11 tareas realistas, sesiones pasadas, 8 equipos de inventario y 4 solicitudes de profesores.
+
+### Fase 7 — Portal de Solicitudes y Módulo de Inventario (~150 Equipos)
+- **Portal Libre para Profesores:**
+  - Acceso directo vía `/solicitar` o botón en Login sin necesidad de crear cuenta.
+  - Selección de nombre, aula/ubicación, tipo (*Falla, Material, Mejora tipo "cables con tierap", Sugerencia*), descripción y foto opcional con compresión en navegador.
+  - Visualización pública del estado de peticiones para que los docentes sepan cuándo fue atendida su solicitud.
+  - Bandeja para Santiago con botón de conversión a Tarea de Kanban con 1 clic.
+- **Inventario y Hoja de Vida de Equipos:**
+  - Registro de equipos por código único, tipo, marca, modelo, ubicación, specs y estado.
+  - Hoja de vida con historial cronológico de todas las intervenciones técnicas y mantenimientos.
+  - Buscador instantáneo optimizado para más de 150 equipos.
+  - Resumen estadístico (total, operativos, mantenimiento pendiente, en reparación).
 
 ---
 
@@ -73,6 +85,20 @@
 | Protección 401 | ✅ Pass | Bloquea todas las rutas protegidas y fotos sin cookie |
 | Rate limiting de login | ✅ Pass | Bloquea a los 5 intentos fallidos consecutivos |
 | Inicio de sesión seguro | ✅ Pass | Entrega cookie `httpOnly` firmada |
+| Verificación `/api/me` | ✅ Pass | Reconoce la sesión activa de Santiago |
+| Validación de motivos | ✅ Pass | Exige motivo al pasar a `waiting`, `suspendida` o `no_realizada` |
+| Transición automática | ✅ Pass | Marca tarea `todo` a `doing` al registrarla en una sesión |
+| Auditoría `task_events` | ✅ Pass | Registra cambios de estado y notas en el historial |
+| Cálculo de horas reporte | ✅ Pass | Excluye suspendidas de asignadas; suma reales cumplidas |
+| Generador texto WhatsApp | ✅ Pass | Coincide con la estructura solicitada en la especificación |
+| Anti Path-Traversal | ✅ Pass | Impide acceso a archivos fuera del directorio de uploads |
+| Servicio estático Express | ✅ Pass | Sirve la app compilada de React en la raíz `/` |
+| Portal solicitudes público | ✅ Pass | Profesores envían y consultan solicitudes sin login |
+| Conversión a tarea | ✅ Pass | Convierte solicitud en tarea de Kanban con 1 clic |
+| Hoja de vida inventario | ✅ Pass | Registra intervenciones y actualiza último servicio |
+| Estadísticas inventario | ✅ Pass | Computa equipos por estado y categoría |
+| Compilación Vite | ✅ Pass | Build limpio en 2.34 segundos |
+| Carga de Seed (`npm run seed`) | ✅ Pass | Carga tareas, sesiones, inventario y solicitudes |
 | Verificación `/api/me` | ✅ Pass | Reconoce la sesión activa de Santiago |
 | Validación de motivos | ✅ Pass | Exige motivo al pasar a `waiting`, `suspendida` o `no_realizada` |
 | Transición automática | ✅ Pass | Marca tarea `todo` a `doing` al registrarla en una sesión |

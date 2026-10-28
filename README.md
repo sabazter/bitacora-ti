@@ -14,6 +14,8 @@ Aplicación web **mobile-first** para la gestión del servicio técnico escolar 
 - **📋 Tablero Kanban:** Organización en 4 estados (*Por hacer*, *En curso*, *Esperando*, *Hecho*) con filtros por categoría y prioridad, y drag & drop en escritorio.
 - **📷 Evidencia Fotográfica Comprimida:** Captura directa con la cámara del móvil. Las imágenes se comprimen en el navegador (Canvas API, máx 1600 px, JPEG calidad 0.8) antes de subirse para optimizar ancho de banda y almacenamiento.
 - **🛒 Módulo de Compras:** Seguimiento de presupuestos (`por_cotizar`, `cotizado`, `aprobado`, `comprado`, `recibido`) con totales de costos estimados en USD.
+- **📢 Portal Libre para Profesores (Sin Cuenta):** Formulario público en `/solicitar` donde los profesores y coordinadores pueden reportar fallas, pedir materiales, solicitar mejoras (*"ordena esos cables con tierap"*) o sugerencias con foto opcional. Incluye consulta pública del estado de sus peticiones y botón de Santiago para convertirlas en Tarea con 1 clic.
+- **🖥️ Inventario y Hoja de Vida (~150 Equipos):** Gestión completa de equipos del colegio (PC, Laptops, Proyectores, Impresoras, Red, etc.) con buscador instantáneo por código/specs/aula, estado operativo y registro cronológico de intervenciones y mantenimientos realizados.
 - **📊 Reportes Ejecutivos:**
   - Cálculo de horas asignadas vs. cumplidas (las sesiones suspendidas no restan cumplimiento; las no realizadas quedan justificadas).
   - Resumen listo para copiar a WhatsApp con un solo clic.

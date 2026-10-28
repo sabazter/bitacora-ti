@@ -10,6 +10,9 @@ const db = getDb();
 
 // Limpiar datos existentes
 db.exec(`
+  DELETE FROM inventory_services;
+  DELETE FROM inventory;
+  DELETE FROM requests;
   DELETE FROM evidence;
   DELETE FROM session_tasks;
   DELETE FROM task_events;
@@ -268,4 +271,195 @@ for (const s of sessions) {
   }
 }
 
-console.log('✅ Seed completado con éxito: 11 tareas, historial de sesiones y evidencia creada.');
+// Insertar equipos de inventario de ejemplo
+console.log('Insertando equipos de inventario de ejemplo...');
+
+const sampleEquipment = [
+  {
+    code: 'PC-LAB1-01',
+    name: 'PC Profesor Lab 1',
+    category: 'pc',
+    brand: 'HP',
+    model: 'ProDesk 600 G3',
+    location: 'Laboratorio 1',
+    specs: 'Intel Core i5-6500 3.2GHz, 16GB DDR4, SSD 480GB Kingston, Windows 11 Pro',
+    status: 'operativo',
+    last_service_date: '2026-10-20',
+    last_service_summary: 'Mantenimiento preventivo, pasta térmica y actualización a Windows 11'
+  },
+  {
+    code: 'PC-LAB1-02',
+    name: 'PC Alumno Lab 1 - Puesto 02',
+    category: 'pc',
+    brand: 'Dell',
+    model: 'OptiPlex 3050',
+    location: 'Laboratorio 1',
+    specs: 'Intel Core i3-7100, 8GB DDR4, SSD 240GB, Windows 10',
+    status: 'operativo',
+    last_service_date: '2026-10-20',
+    last_service_summary: 'Limpieza de ventiladores y desfragmentación'
+  },
+  {
+    code: 'PC-LAB1-03',
+    name: 'PC Alumno Lab 1 - Puesto 03',
+    category: 'pc',
+    brand: 'Dell',
+    model: 'OptiPlex 3050',
+    location: 'Laboratorio 1',
+    specs: 'Intel Core i3-7100, 8GB DDR4, HDD 500GB, Windows 10',
+    status: 'mantenimiento_pendiente',
+    last_service_date: '2026-08-15',
+    last_service_summary: 'Disco mecánico lento, requiere migración a SSD'
+  },
+  {
+    code: 'PROY-LAB2',
+    name: 'Proyector Interactivo Lab 2',
+    category: 'proyector',
+    brand: 'Epson',
+    model: 'PowerLite X39',
+    location: 'Laboratorio 2',
+    specs: '3500 lúmenes, HDMI/VGA, Lámpara 240W',
+    status: 'operativo',
+    last_service_date: '2026-10-25',
+    last_service_summary: 'Instalación en techo y calibración de proyección con PC docente'
+  },
+  {
+    code: 'IMP-SALAPROF',
+    name: 'Impresora Sala de Profesores',
+    category: 'impresora',
+    brand: 'HP',
+    model: 'LaserJet P1102w',
+    location: 'Sala de Profesores',
+    specs: 'Monocromática, Tóner CE285A (85A), USB y WiFi',
+    status: 'operativo',
+    last_service_date: '2026-10-26',
+    last_service_summary: 'Reemplazo de cartucho de tóner y prueba de impresión en red'
+  },
+  {
+    code: 'PC-SEC-01',
+    name: 'PC Secretaria Principal',
+    category: 'pc',
+    brand: 'Lenovo',
+    model: 'ThinkCentre M720s',
+    location: 'Secretaría',
+    specs: 'Intel Core i5-8400, 8GB RAM, SSD 256GB, Windows 11',
+    status: 'en_reparacion',
+    last_service_date: '2026-10-24',
+    last_service_summary: 'Fuente de poder dañada por bajón eléctrico, esperando repuesto'
+  },
+  {
+    code: 'SW-LAB1',
+    name: 'Switch de Red Lab 1',
+    category: 'red',
+    brand: 'TP-Link',
+    model: 'TL-SG1016D Gigabit',
+    location: 'Laboratorio 1',
+    specs: '16 puertos Gigabit 10/100/1000 Mbps',
+    status: 'mantenimiento_pendiente',
+    last_service_date: '2026-09-10',
+    last_service_summary: 'Puertos 3 y 4 con fallas, cotizada sustitución'
+  },
+  {
+    code: 'ROUTER-PPAL',
+    name: 'Router Principal Mikrotik',
+    category: 'red',
+    brand: 'MikroTik',
+    model: 'RB750Gr3 (hEX)',
+    location: 'Servidor Central',
+    specs: 'Dual Core 880MHz, 256MB RAM, 5 puertos GbE, RouterOS v7',
+    status: 'operativo',
+    last_service_date: '2026-10-05',
+    last_service_summary: 'Respaldo de configuración y asignación de DHCP para nuevo rango'
+  }
+];
+
+const insertEquipStmt = db.prepare(`
+  INSERT INTO inventory (
+    code, name, category, brand, model, location, specs, status, last_service_date, last_service_summary
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+
+const insertServiceStmt = db.prepare(`
+  INSERT INTO inventory_services (
+    equipment_id, service_date, action_taken, technician, notes
+  ) VALUES (?, ?, ?, ?, ?)
+`);
+
+for (const eq of sampleEquipment) {
+  const r = insertEquipStmt.run(
+    eq.code,
+    eq.name,
+    eq.category,
+    eq.brand,
+    eq.model,
+    eq.location,
+    eq.specs,
+    eq.status,
+    eq.last_service_date,
+    eq.last_service_summary
+  );
+  const equipId = Number(r.lastInsertRowid);
+
+  if (eq.last_service_date && eq.last_service_summary) {
+    insertServiceStmt.run(
+      equipId,
+      eq.last_service_date,
+      eq.last_service_summary,
+      'Santiago',
+      'Servicio inicial registrado en inventario'
+    );
+  }
+}
+
+// Insertar solicitudes de profesores de ejemplo
+console.log('Insertando solicitudes de ejemplo...');
+const sampleRequests = [
+  {
+    requester_name: 'Prof. Carlos Mendoza',
+    location: 'Laboratorio 1',
+    type: 'mejora',
+    description: 'Por favor si puedes ordenar los cables detrás del escritorio con tierap para que los alumnos no los pateen.',
+    status: 'pendiente'
+  },
+  {
+    requester_name: 'Coord. María Rodríguez',
+    location: 'Sala de Profesores',
+    type: 'material',
+    description: 'Necesitamos una resma de papel carta y verificar si queda tóner de repuesto en el depósito.',
+    status: 'en_proceso',
+    admin_note: 'Agendada para compra en próxima sesión'
+  },
+  {
+    requester_name: 'Prof. Luisa Blanco',
+    location: 'Aula 4A',
+    type: 'falla',
+    description: 'El cable HDMI del salón tiene falso contacto y la pantalla parpadea en verde cuando se mueve la laptop.',
+    status: 'pendiente'
+  },
+  {
+    requester_name: 'Sra. Carmen (Secretaría)',
+    location: 'Secretaría',
+    type: 'falla',
+    description: 'La computadora no prende esta mañana, hace un zumbido bajo y se apaga.',
+    status: 'resuelta',
+    admin_note: 'Revisada: fuente de poder dañada, se dejó desmontada esperando repuesto'
+  }
+];
+
+const insertReqStmt = db.prepare(`
+  INSERT INTO requests (requester_name, location, type, description, status, admin_note)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
+
+for (const rq of sampleRequests) {
+  insertReqStmt.run(
+    rq.requester_name,
+    rq.location,
+    rq.type,
+    rq.description,
+    rq.status,
+    rq.admin_note || null
+  );
+}
+
+console.log('✅ Seed completado con éxito: 11 tareas, historial de sesiones, 8 equipos de inventario y 4 solicitudes de profesores.');

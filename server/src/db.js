@@ -95,6 +95,62 @@ function initSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_evidence_session_id ON evidence(session_id);
     CREATE INDEX IF NOT EXISTS idx_evidence_task_id ON evidence(task_id);
+
+    -- Solicitudes y reportes de profesores y coordinadores (sin cuenta)
+    CREATE TABLE IF NOT EXISTS requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      requester_name TEXT NOT NULL,
+      location TEXT,
+      type TEXT CHECK(type IN ('falla', 'material', 'mejora', 'sugerencia')) DEFAULT 'falla',
+      description TEXT NOT NULL,
+      photo_url TEXT,
+      status TEXT CHECK(status IN ('pendiente', 'en_proceso', 'resuelta', 'descartada')) DEFAULT 'pendiente',
+      admin_note TEXT,
+      task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+      created_at TEXT DEFAULT (datetime('now', 'localtime')),
+      resolved_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
+    CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests(created_at);
+
+    -- Inventario de equipos del colegio
+    CREATE TABLE IF NOT EXISTS inventory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT CHECK(category IN ('pc', 'laptop', 'proyector', 'impresora', 'red', 'monitor', 'ups', 'otro')) DEFAULT 'pc',
+      brand TEXT,
+      model TEXT,
+      location TEXT NOT NULL,
+      specs TEXT,
+      status TEXT CHECK(status IN ('operativo', 'mantenimiento_pendiente', 'en_reparacion', 'de_baja')) DEFAULT 'operativo',
+      last_service_date TEXT,
+      last_service_summary TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_inventory_code ON inventory(code);
+    CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category);
+    CREATE INDEX IF NOT EXISTS idx_inventory_location ON inventory(location);
+    CREATE INDEX IF NOT EXISTS idx_inventory_status ON inventory(status);
+
+    -- Hoja de vida / Historial de servicios e intervenciones por equipo
+    CREATE TABLE IF NOT EXISTS inventory_services (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER NOT NULL REFERENCES inventory(id) ON DELETE CASCADE,
+      service_date TEXT NOT NULL,
+      action_taken TEXT NOT NULL,
+      technician TEXT DEFAULT 'Santiago',
+      session_id INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
+      task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_inventory_services_equipment_id ON inventory_services(equipment_id);
   `);
 }
 

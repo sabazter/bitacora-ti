@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Wrench, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Wrench, Lock, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export function LoginView() {
+export function LoginView({ onOpenPublicPortal }) {
   const { login } = useAuth();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -99,7 +99,29 @@ export function LoginView() {
           </button>
         </form>
 
-        <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '12px', color: '#94a3b8' }}>
+        {onOpenPublicPortal && (
+          <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #e2e8f0', textAlign: 'center' }}>
+            <button
+              onClick={onOpenPublicPortal}
+              className="btn btn-outline btn-block"
+              style={{
+                color: '#2563eb',
+                borderColor: '#bfdbfe',
+                backgroundColor: '#eff6ff',
+                fontSize: '13px',
+                fontWeight: 600
+              }}
+            >
+              <Sparkles size={16} color="#2563eb" />
+              <span>Portal de Solicitudes (Profesores)</span>
+            </button>
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+              Para pedir materiales, reparaciones o mejoras sin cuenta.
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '11px', color: '#94a3b8' }}>
           Sistema protegido con limitación de intentos y sesión segura.
         </div>
       </div>

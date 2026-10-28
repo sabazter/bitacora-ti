@@ -8,10 +8,13 @@ import { Lightbox } from './components/Lightbox';
 
 import { HoyView } from './views/HoyView';
 import { TableroView } from './views/TableroView';
+import { SolicitudesAdminView } from './views/SolicitudesAdminView';
+import { InventarioView } from './views/InventarioView';
 import { ComprasView } from './views/ComprasView';
 import { BitacoraView } from './views/BitacoraView';
 import { ReportesView } from './views/ReportesView';
 import { AjustesView } from './views/AjustesView';
+import { PublicSolicitudView } from './views/PublicSolicitudView';
 
 export function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -19,6 +22,11 @@ export function App() {
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Detectar si el usuario abre directamente la ruta del portal de solicitudes
+  const isDirectSolicitud = typeof window !== 'undefined' && 
+    (window.location.pathname.includes('/solicitar') || window.location.pathname.includes('/pedir'));
+  const [showPublicPortal, setShowPublicPortal] = useState(isDirectSolicitud);
 
   if (isLoading) {
     return (
@@ -37,8 +45,13 @@ export function App() {
     );
   }
 
+  // Vista Pública de Solicitudes para Profesores y Coordinadores (sin cuenta)
+  if (showPublicPortal) {
+    return <PublicSolicitudView onGoToLogin={() => setShowPublicPortal(false)} />;
+  }
+
   if (!isAuthenticated) {
-    return <LoginView />;
+    return <LoginView onOpenPublicPortal={() => setShowPublicPortal(true)} />;
   }
 
   const handleOpenTask = id => {
@@ -69,7 +82,11 @@ export function App() {
   return (
     <div className="app-container">
       {/* Navegación (Sidebar en desktop, barra inferior en móvil) */}
-      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Navigation 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        onOpenPublicPortal={() => setShowPublicPortal(true)} 
+      />
 
       <main className="main-content">
         <Header activeTab={activeTab} />
@@ -86,6 +103,17 @@ export function App() {
             <TableroView
               onOpenTask={handleOpenTask}
             />
+          )}
+
+          {activeTab === 'solicitudes' && (
+            <SolicitudesAdminView
+              onSelectPhoto={handleSelectPhoto}
+              onOpenTask={handleOpenTask}
+            />
+          )}
+
+          {activeTab === 'inventario' && (
+            <InventarioView />
           )}
 
           {activeTab === 'compras' && (

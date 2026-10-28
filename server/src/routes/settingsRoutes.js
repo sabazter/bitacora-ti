@@ -57,7 +57,10 @@ router.get('/export', (req, res) => {
     task_events: db.prepare('SELECT * FROM task_events').all(),
     sessions: db.prepare('SELECT * FROM sessions').all(),
     session_tasks: db.prepare('SELECT * FROM session_tasks').all(),
-    evidence: db.prepare('SELECT id, session_id, task_id, filename, original_name, caption, created_at FROM evidence').all()
+    evidence: db.prepare('SELECT id, session_id, task_id, filename, original_name, caption, created_at FROM evidence').all(),
+    requests: db.prepare('SELECT * FROM requests').all(),
+    inventory: db.prepare('SELECT * FROM inventory').all(),
+    inventory_services: db.prepare('SELECT * FROM inventory_services').all()
   };
 
   const filename = `bitacora-backup-${new Date().toISOString().slice(0, 10)}.json`;

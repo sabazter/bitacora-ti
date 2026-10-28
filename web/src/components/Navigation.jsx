@@ -7,16 +7,21 @@ import {
   FileText, 
   Settings, 
   LogOut, 
-  Wrench 
+  Wrench,
+  Inbox,
+  Monitor,
+  Share2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export function Navigation({ activeTab, setActiveTab }) {
+export function Navigation({ activeTab, setActiveTab, onOpenPublicPortal }) {
   const { logout, user } = useAuth();
 
   const tabs = [
     { id: 'hoy', label: 'Hoy', icon: Calendar },
     { id: 'tablero', label: 'Tablero', icon: LayoutDashboard },
+    { id: 'solicitudes', label: 'Solicitudes', icon: Inbox },
+    { id: 'inventario', label: 'Inventario', icon: Monitor },
     { id: 'compras', label: 'Compras', icon: ShoppingCart },
     { id: 'bitacora', label: 'Bitácora', icon: BookOpen },
     { id: 'reportes', label: 'Reportes', icon: FileText },
@@ -48,6 +53,20 @@ export function Navigation({ activeTab, setActiveTab }) {
             );
           })}
         </nav>
+
+        {onOpenPublicPortal && (
+          <div style={{ marginBottom: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '0.75rem' }}>
+            <button
+              className="sidebar-link"
+              onClick={onOpenPublicPortal}
+              style={{ fontSize: '13px', color: '#38bdf8' }}
+              title="Abrir enlace del portal de profesores"
+            >
+              <Share2 size={16} />
+              <span>Portal Profesores</span>
+            </button>
+          </div>
+        )}
 
         <div className="sidebar-footer">
           <div style={{ fontSize: '13px', color: '#94a3b8' }}>

@@ -254,4 +254,81 @@ describe('Bitácora TI - Pruebas del Backend y Seguridad', () => {
     assert.match(res.text, /id="root"/i);
   });
 
+  test('Portal público: profesores pueden enviar y consultar solicitudes sin login', async () => {
+    // 1. Enviar solicitud pública
+    const createRes = await request(app)
+      .post('/api/public/requests')
+      .send({
+        requester_name: 'Prof. Ana Gómez',
+        location: 'Salón 3A',
+        type: 'mejora',
+        description: 'Por favor ordenar los cables de la toma con tierap'
+      });
+
+    assert.equal(createRes.status, 201);
+    assert.equal(createRes.body.success, true);
+    const requestId = createRes.body.request.id;
+
+    // 2. Consultar lista pública
+    const listRes = await request(app).get('/api/public/requests');
+    assert.equal(listRes.status, 200);
+    assert.ok(Array.isArray(listRes.body));
+    const found = listRes.body.find(r => r.id === requestId);
+    assert.ok(found);
+    assert.equal(found.requester_name, 'Prof. Ana Gómez');
+
+    // 3. Convertir solicitud en tarea (como Santiago autenticado)
+    const convertRes = await request(app)
+      .post(`/api/requests/${requestId}/convert-to-task`)
+      .set('Cookie', authCookie);
+
+    assert.equal(convertRes.status, 200);
+    assert.equal(convertRes.body.request.status, 'en_proceso');
+    assert.ok(convertRes.body.task.id);
+  });
+
+  test('Módulo Inventario: registro de equipo y hoja de vida con servicios', async () => {
+    // 1. Crear equipo
+    const code = `PC-TEST-${Date.now().toString().slice(-4)}`;
+    const createRes = await request(app)
+      .post('/api/inventory')
+      .set('Cookie', authCookie)
+      .send({
+        code,
+        name: 'PC Laboratorio Prueba',
+        category: 'pc',
+        brand: 'HP',
+        model: 'ProDesk 600 G3',
+        location: 'Laboratorio 1',
+        specs: 'Core i5-6500, 16GB RAM, SSD 480GB, Windows 11',
+        status: 'operativo'
+      });
+
+    assert.equal(createRes.status, 201);
+    const equipId = createRes.body.id;
+
+    // 2. Registrar servicio / intervención en la hoja de vida
+    const serviceRes = await request(app)
+      .post(`/api/inventory/${equipId}/services`)
+      .set('Cookie', authCookie)
+      .send({
+        service_date: '2026-10-28',
+        action_taken: 'Limpieza preventiva, cambio de pasta térmica y optimización de inicio',
+        technician: 'Santiago'
+      });
+
+    assert.equal(serviceRes.status, 201);
+    assert.equal(serviceRes.body.equipment.last_service_date, '2026-10-28');
+    assert.match(serviceRes.body.equipment.last_service_summary, /pasta térmica/);
+    assert.equal(serviceRes.body.services.length, 1);
+
+    // 3. Consultar estadísticas de inventario
+    const statsRes = await request(app)
+      .get('/api/inventory/stats')
+      .set('Cookie', authCookie);
+
+    assert.equal(statsRes.status, 200);
+    assert.ok(statsRes.body.total >= 1);
+  });
+
 });
