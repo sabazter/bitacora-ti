@@ -388,7 +388,7 @@ export function HoyView({ onOpenTask, onSelectPhoto }) {
                           <span className={`cat-badge cat-${task.category}`}>{task.category}</span>
                           <span 
                             style={{ fontWeight: 600, fontSize: '14px', cursor: 'pointer', color: '#1e293b' }}
-                            onClick={() => onOpenTask && onOpenTask(task.id)}
+                            onClick={() => onOpenTask && onOpenTask(task.id, task.category)}
                           >
                             {task.title}
                           </span>

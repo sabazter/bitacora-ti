@@ -60,16 +60,30 @@ router.post('/', (req, res) => {
   }
 
   const cleanCategory = category && VALID_CATEGORIES.includes(category) ? category : 'soporte';
-  const cleanStatus = status && VALID_STATUSES.includes(status) ? status : 'todo';
+  let cleanStatus = status && VALID_STATUSES.includes(status) ? status : 'todo';
   const cleanPriority = priority && VALID_PRIORITIES.includes(priority) ? priority : 'media';
-
-  if (cleanStatus === 'waiting' && (!waiting_reason || !waiting_reason.trim())) {
-    return res.status(400).json({ error: 'El motivo es obligatorio cuando el estado es Esperando.' });
-  }
 
   const cleanPurchaseStatus = purchase_status && VALID_PURCHASE_STATUSES.includes(purchase_status)
     ? purchase_status
     : (cleanCategory === 'compra' ? 'por_cotizar' : null);
+
+  let cleanWaitingReason = waiting_reason;
+  // Sincronización inteligente inicial para compras
+  if (cleanCategory === 'compra') {
+    if (cleanPurchaseStatus === 'cotizado' && cleanStatus === 'todo') {
+      cleanStatus = 'waiting';
+      cleanWaitingReason = cleanWaitingReason || 'Esperando aprobación de cotización por directiva';
+    } else if (cleanPurchaseStatus === 'comprado' && cleanStatus === 'todo') {
+      cleanStatus = 'waiting';
+      cleanWaitingReason = cleanWaitingReason || 'Material comprado: esperando llegada/entrega';
+    } else if (cleanPurchaseStatus === 'recibido') {
+      cleanStatus = 'done';
+    }
+  }
+
+  if (cleanStatus === 'waiting' && (!cleanWaitingReason || !cleanWaitingReason.trim())) {
+    return res.status(400).json({ error: 'El motivo es obligatorio cuando el estado es Esperando.' });
+  }
 
   const doneAt = cleanStatus === 'done' ? new Date().toISOString() : null;
 
@@ -93,7 +107,7 @@ router.post('/', (req, res) => {
     cleanPriority,
     location || null,
     requested_by || null,
-    cleanStatus === 'waiting' ? waiting_reason?.trim() : null,
+    cleanStatus === 'waiting' ? cleanWaitingReason?.trim() : null,
     due_date || null,
     position,
     doneAt,
@@ -171,6 +185,31 @@ router.patch('/:id', (req, res) => {
   }
   if (updates.purchase_status && !VALID_PURCHASE_STATUSES.includes(updates.purchase_status)) {
     return res.status(400).json({ error: 'Estado de compra inválido.' });
+  }
+
+  // Sincronización inteligente de compra <-> tablero Kanban
+  const isCompra = (updates.category || currentTask.category) === 'compra';
+  if (isCompra) {
+    if (updates.purchase_status) {
+      if (updates.purchase_status === 'recibido' && !updates.status) {
+        updates.status = 'done';
+      } else if (updates.purchase_status === 'aprobado' && !updates.status && currentTask.status === 'waiting') {
+        updates.status = 'todo';
+        updates.waiting_reason = null;
+      } else if (updates.purchase_status === 'cotizado' && !updates.status) {
+        updates.status = 'waiting';
+        updates.waiting_reason = updates.waiting_reason || 'Esperando aprobación de cotización por directiva';
+      } else if (updates.purchase_status === 'comprado' && !updates.status) {
+        updates.status = 'waiting';
+        updates.waiting_reason = updates.waiting_reason || 'Material comprado: esperando llegada/entrega';
+      } else if (updates.purchase_status === 'por_cotizar' && !updates.status && currentTask.status === 'done') {
+        updates.status = 'todo';
+      }
+    } else if (updates.status) {
+      if (updates.status === 'done' && currentTask.purchase_status !== 'recibido') {
+        updates.purchase_status = 'recibido';
+      }
+    }
   }
 
   const targetStatus = updates.status || currentTask.status;

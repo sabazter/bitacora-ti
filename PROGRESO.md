@@ -87,6 +87,37 @@
 
 ---
 
+### Fase 9 — Reestructuración Integral del Módulo de Compras
+- **Centro de Mando de Compras Independiente:**
+  - Botón principal destacado: `+ Nueva Petición de Compra` directamente en la vista de compras.
+  - Componente dedicado `PurchaseModal` con todos los campos de gestión financiera:
+    - Artículo/Material a comprar.
+    - Presupuesto: Costo estimado o cotizado, Moneda (USD / Bs), Proveedor o Tienda cotizada.
+    - Justificación y descripción del requerimiento.
+    - Solicitante (docente, coordinador, dirección, técnico) y Salón/Destino.
+    - Selector visual de los 5 estados del ciclo de compra:
+      1. *Por Cotizar* (buscando tiendas y precios)
+      2. *Cotizado* (esperando visto bueno directivo)
+      3. *Aprobado* (presupuesto autorizado, listo para comprar)
+      4. *Comprado* (pagado, en camino o por retirar)
+      5. *Recibido* (en el colegio, listo para entrega o instalación)
+    - Botón de avance rápido por tarjeta en 1 clic.
+  - Tarjetas de resumen financiero (KPIs) en tiempo real:
+    - 🟡 **Por Aprobar** (cotizados o por cotizar)
+    - 🔵 **Aprobado para Comprar** (listo para desembolso)
+    - 🟢 **Comprado este Mes** (ejecutado en el período)
+    - 🟣 **Total Compras** (historial consolidado)
+- **Sincronización Bidireccional con el Tablero Kanban:**
+  - Las compras se reflejan en el Tablero con diseño distintivo: insignia `🛒 COMPRA`, estado de cotización, monto y proveedor.
+  - Al hacer clic sobre una tarjeta de compra en el Tablero se abre directamente el **Gestor de Compra** (`PurchaseModal`).
+  - Sincronización inteligente de columnas:
+    - Al aprobar una compra $\rightarrow$ pasa a Por hacer / En curso.
+    - Al marcarla como comprada o cotizada $\rightarrow$ pasa a Esperando (con motivo automático).
+    - Al marcarla como recibida $\rightarrow$ pasa a Hecho (`done`) con fecha de finalización.
+    - Al moverla en el tablero a Hecho $\rightarrow$ pasa a recibida.
+
+---
+
 ## 2. Pruebas Realizadas
 
 | Módulo / Prueba | Resultado | Descripción |
@@ -110,7 +141,8 @@
 | Hoja de vida inventario | ✅ Pass | Registra intervenciones y actualiza último servicio |
 | Estadísticas inventario | ✅ Pass | Computa equipos por estado, categoría y área |
 | Reportes Semanales Viernes | ✅ Pass | Genera, archiva y consulta reportes ejecutivos para supervisores |
-| Compilación Vite | ✅ Pass | Build limpio en 2.29 segundos (76 kB gzipped) |
+| Gestión de Compras & Sync | ✅ Pass | Registro de compras con presupuesto y sync bidireccional con Kanban |
+| Compilación Vite | ✅ Pass | Build limpio en 2.33 segundos (80 kB gzipped) |
 | Carga de Seed (`npm run seed`) | ✅ Pass | Genera sesiones, 11 tareas, 8 equipos jerárquicos y 4 solicitudes |
 
 ---

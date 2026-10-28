@@ -4,6 +4,7 @@ import { LoginView } from './views/LoginView';
 import { Navigation } from './components/Navigation';
 import { Header } from './components/Header';
 import { TaskModal } from './components/TaskModal';
+import { PurchaseModal } from './components/PurchaseModal';
 import { Lightbox } from './components/Lightbox';
 
 import { HoyView } from './views/HoyView';
@@ -20,6 +21,7 @@ export function App() {
   const { isAuthenticated, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('hoy');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState(null);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -54,12 +56,20 @@ export function App() {
     return <LoginView onOpenPublicPortal={() => setShowPublicPortal(true)} />;
   }
 
-  const handleOpenTask = id => {
-    setSelectedTaskId(id);
+  const handleOpenTask = (id, category) => {
+    if (category === 'compra') {
+      setSelectedPurchaseId(id);
+    } else {
+      setSelectedTaskId(id);
+    }
   };
 
   const handleCloseTask = () => {
     setSelectedTaskId(null);
+  };
+
+  const handleClosePurchase = () => {
+    setSelectedPurchaseId(null);
   };
 
   const handleTaskUpdated = () => {
@@ -68,6 +78,7 @@ export function App() {
 
   const handleTaskDeleted = () => {
     setSelectedTaskId(null);
+    setSelectedPurchaseId(null);
     setRefreshKey(prev => prev + 1);
   };
 
@@ -149,6 +160,16 @@ export function App() {
           onTaskUpdated={handleTaskUpdated}
           onTaskDeleted={handleTaskDeleted}
           onSelectPhoto={handleSelectPhoto}
+        />
+      )}
+
+      {/* Modal Dedicado de Gestión de Compra */}
+      {selectedPurchaseId && (
+        <PurchaseModal
+          taskId={selectedPurchaseId}
+          onClose={handleClosePurchase}
+          onSaved={handleTaskUpdated}
+          onDeleted={handleTaskDeleted}
         />
       )}
 

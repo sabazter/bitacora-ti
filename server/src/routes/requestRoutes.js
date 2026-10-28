@@ -192,8 +192,8 @@ adminRequestRouter.post('/:id/convert-to-task', (req, res) => {
   // Crear la tarea
   const insertTask = db.prepare(`
     INSERT INTO tasks (
-      title, description, category, status, priority, location, requested_by, position
-    ) VALUES (?, ?, ?, 'todo', 'media', ?, ?, ?)
+      title, description, category, status, priority, location, requested_by, position, purchase_status
+    ) VALUES (?, ?, ?, 'todo', 'media', ?, ?, ?, ?)
   `);
 
   const taskTitle = `[Solicitud] ${requestRecord.description.slice(0, 60)}${requestRecord.description.length > 60 ? '...' : ''}`;
@@ -205,7 +205,8 @@ adminRequestRouter.post('/:id/convert-to-task', (req, res) => {
     category,
     requestRecord.location,
     requestRecord.requester_name,
-    position
+    position,
+    category === 'compra' ? 'por_cotizar' : null
   );
 
   const taskId = Number(taskResult.lastInsertRowid);

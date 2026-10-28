@@ -384,4 +384,63 @@ describe('Bitácora TI - Pruebas del Backend y Seguridad', () => {
     assert.equal(detailRes.body.id, genRes.body.report.id);
   });
 
+  test('Gestión de Compras: registro de adquisición y sincronización bidireccional con el Tablero Kanban', async () => {
+    // 1. Crear nueva petición de compra con cotización
+    const createRes = await request(app)
+      .post('/api/tasks')
+      .set('Cookie', authCookie)
+      .send({
+        title: 'Bobina de Cable UTP Cat6 y 50 Conectores RJ45',
+        category: 'compra',
+        description: 'Material para cablear 10 puestos en Laboratorio 1',
+        location: 'Laboratorio 1',
+        requested_by: 'Santiago TI',
+        supplier: 'CompuMall Barquisimeto',
+        est_cost: 65.50,
+        currency: 'USD',
+        purchase_status: 'cotizado',
+        priority: 'alta'
+      });
+
+    assert.equal(createRes.status, 201);
+    const purchaseId = createRes.body.id;
+    assert.equal(createRes.body.category, 'compra');
+    assert.equal(createRes.body.purchase_status, 'cotizado');
+    assert.equal(createRes.body.status, 'waiting'); // Automáticamente en espera de aprobación
+    assert.ok(createRes.body.waiting_reason);
+
+    // 2. Aprobar compra -> pasa a 'todo' automáticamente
+    const approveRes = await request(app)
+      .patch(`/api/tasks/${purchaseId}`)
+      .set('Cookie', authCookie)
+      .send({
+        purchase_status: 'aprobado'
+      });
+
+    assert.equal(approveRes.status, 200);
+    const updatedTask = await request(app)
+      .get(`/api/tasks/${purchaseId}`)
+      .set('Cookie', authCookie);
+
+    assert.equal(updatedTask.body.purchase_status, 'aprobado');
+    assert.equal(updatedTask.body.status, 'todo');
+
+    // 3. Recibir compra -> pasa a 'done' automáticamente
+    const receiveRes = await request(app)
+      .patch(`/api/tasks/${purchaseId}`)
+      .set('Cookie', authCookie)
+      .send({
+        purchase_status: 'recibido'
+      });
+
+    assert.equal(receiveRes.status, 200);
+    const receivedTask = await request(app)
+      .get(`/api/tasks/${purchaseId}`)
+      .set('Cookie', authCookie);
+
+    assert.equal(receivedTask.body.purchase_status, 'recibido');
+    assert.equal(receivedTask.body.status, 'done');
+    assert.ok(receivedTask.body.done_at);
+  });
+
 });

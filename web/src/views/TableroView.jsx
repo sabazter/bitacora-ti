@@ -246,69 +246,134 @@ export function TableroView({ onOpenTask }) {
                     Sin tareas
                   </div>
                 ) : (
-                  colTasks.map(task => (
-                    <div
-                      key={task.id}
-                      className="kanban-card"
-                      draggable
-                      onDragStart={e => handleDragStart(e, task.id)}
-                      onClick={() => onOpenTask && onOpenTask(task.id)}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
-                        <span className={`cat-badge cat-${task.category}`}>{task.category}</span>
-                        <span style={{
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          color: task.priority === 'alta' ? '#ef4444' : task.priority === 'baja' ? '#64748b' : '#3b82f6'
-                        }}>
-                          {task.priority.toUpperCase()}
-                        </span>
-                      </div>
+                  colTasks.map(task => {
+                    const isCompra = task.category === 'compra';
+                    const pStatusMap = {
+                      por_cotizar: { label: 'Por Cotizar', color: '#64748b', bg: '#f1f5f9' },
+                      cotizado: { label: 'Cotizado', color: '#d97706', bg: '#fef3c7' },
+                      aprobado: { label: 'Aprobado', color: '#2563eb', bg: '#dbeafe' },
+                      comprado: { label: 'Comprado', color: '#7c3aed', bg: '#ede9fe' },
+                      recibido: { label: 'Recibido', color: '#059669', bg: '#d1fae5' }
+                    };
+                    const pInfo = isCompra ? pStatusMap[task.purchase_status || 'por_cotizar'] : null;
 
-                      <div style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a', marginBottom: '0.35rem' }}>
-                        {task.title}
-                      </div>
-
-                      {task.location && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '12px', color: '#64748b' }}>
-                          <MapPin size={12} />
-                          <span>{task.location}</span>
-                        </div>
-                      )}
-
-                      {task.status === 'waiting' && task.waiting_reason && (
-                        <div style={{
-                          marginTop: '0.4rem',
-                          padding: '0.25rem 0.45rem',
-                          background: '#fffbeb',
-                          border: '1px solid #fde68a',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          color: '#b45309'
-                        }}>
-                          <strong>Motivo:</strong> {task.waiting_reason}
-                        </div>
-                      )}
-
-                      {/* Selector de estado para móviles */}
+                    return (
                       <div
-                        style={{ marginTop: '0.5rem', paddingTop: '0.4rem', borderTop: '1px solid #f1f5f9' }}
-                        onClick={e => e.stopPropagation()}
+                        key={task.id}
+                        className="kanban-card"
+                        draggable
+                        onDragStart={e => handleDragStart(e, task.id)}
+                        onClick={() => onOpenTask && onOpenTask(task.id, task.category)}
+                        style={isCompra ? {
+                          borderLeft: '4px solid #7c3aed',
+                          background: '#fcfaff'
+                        } : {}}
                       >
-                        <select
-                          className="form-control"
-                          value={task.status}
-                          onChange={e => handleMoveStatus(task.id, e.target.value)}
-                          style={{ fontSize: '11px', padding: '0.2rem 0.4rem', height: '26px' }}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.25rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+                            {isCompra ? (
+                              <span style={{
+                                backgroundColor: '#7c3aed',
+                                color: '#ffffff',
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '4px',
+                                letterSpacing: '0.3px'
+                              }}>
+                                🛒 COMPRA
+                              </span>
+                            ) : (
+                              <span className={`cat-badge cat-${task.category}`}>{task.category}</span>
+                            )}
+
+                            {pInfo && (
+                              <span style={{
+                                backgroundColor: pInfo.bg,
+                                color: pInfo.color,
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '0.1rem 0.35rem',
+                                borderRadius: '4px'
+                              }}>
+                                {pInfo.label}
+                              </span>
+                            )}
+                          </div>
+
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: task.priority === 'alta' ? '#ef4444' : task.priority === 'baja' ? '#64748b' : '#3b82f6'
+                          }}>
+                            {task.priority.toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a', marginBottom: '0.35rem' }}>
+                          {task.title}
+                        </div>
+
+                        {/* Detalles de compra (Monto y proveedor) */}
+                        {isCompra && (task.est_cost || task.supplier) && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: '#f3e8ff',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '4px',
+                            fontSize: '11.5px',
+                            color: '#6b21a8',
+                            marginBottom: '0.4rem',
+                            fontWeight: 600
+                          }}>
+                            <span>{task.supplier ? `🏢 ${task.supplier}` : 'Sin proveedor'}</span>
+                            <span>{task.est_cost ? `$${task.est_cost.toFixed(2)} ${task.currency || 'USD'}` : 'Por cotizar'}</span>
+                          </div>
+                        )}
+
+                        {task.location && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '12px', color: '#64748b' }}>
+                            <MapPin size={12} />
+                            <span>{task.location}</span>
+                          </div>
+                        )}
+
+                        {task.status === 'waiting' && task.waiting_reason && (
+                          <div style={{
+                            marginTop: '0.4rem',
+                            padding: '0.25rem 0.45rem',
+                            background: '#fffbeb',
+                            border: '1px solid #fde68a',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            color: '#b45309'
+                          }}>
+                            <strong>Motivo:</strong> {task.waiting_reason}
+                          </div>
+                        )}
+
+                        {/* Selector de estado para móviles */}
+                        <div
+                          style={{ marginTop: '0.5rem', paddingTop: '0.4rem', borderTop: '1px solid #f1f5f9' }}
+                          onClick={e => e.stopPropagation()}
                         >
-                          <option value="todo">Mover: Por hacer</option>
-                          <option value="doing">Mover: En curso</option>
-                          <option value="waiting">Mover: Esperando</option>
-                          <option value="done">Mover: Hecho</option>
-                        </select>
+                          <select
+                            className="form-control"
+                            value={task.status}
+                            onChange={e => handleMoveStatus(task.id, e.target.value)}
+                            style={{ fontSize: '11px', padding: '0.2rem 0.4rem', height: '26px' }}
+                          >
+                            <option value="todo">Mover: Por hacer</option>
+                            <option value="doing">Mover: En curso</option>
+                            <option value="waiting">Mover: Esperando</option>
+                            <option value="done">Mover: Hecho</option>
+                          </select>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
