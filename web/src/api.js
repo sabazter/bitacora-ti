@@ -89,6 +89,9 @@ export const api = {
     const qs = date ? `?period=${period}&date=${date}` : `?period=${period}`;
     return request(`/api/reports/text${qs}`);
   },
+  getSavedReports: () => request('/api/reports/saved'),
+  getSavedReport: id => request(`/api/reports/saved/${id}`),
+  generateWeeklyReport: date => request('/api/reports/generate-week', { method: 'POST', body: JSON.stringify({ date }) }),
 
   // Settings & Export
   getSettings: () => request('/api/settings'),

@@ -254,6 +254,155 @@ export function formatWhatsAppSummary(report) {
   return text.trim();
 }
 
+// ========================================================
+// REPORTE SEMANAL GUARDADO Y ARCHIVADO (ESPECIAL VIERNES)
+// ========================================================
+
+export function saveWeeklyReport(targetDate = null) {
+  ensureSessionsGenerated();
+  const db = getDb();
+  const report = generateReportData('week', targetDate);
+  const { range, hours, tasks } = report;
+
+  const weekCode = `${range.from}_${range.to}`;
+  const title = `Reporte Semanal: ${range.label}`;
+
+  // 1. Problemas Ocurridos (sesiones no realizadas o suspendidas, fallas reportadas)
+  const problems = [];
+  if (hours.notDone.length > 0) {
+    hours.notDone.forEach(s => problems.push(`Sesión no realizada (${s.date}): ${s.reason}`));
+  }
+  if (hours.suspended.length > 0) {
+    hours.suspended.forEach(s => problems.push(`Sesión suspendida (${s.date}): ${s.reason}`));
+  }
+  // Consultar fallas reportadas por profesores en el periodo
+  const teacherFaults = db.prepare(`
+    SELECT * FROM requests 
+    WHERE created_at >= ? AND created_at <= ? || ' 23:59:59' AND type = 'falla'
+  `).all(range.from, range.to);
+  teacherFaults.forEach(f => {
+    problems.push(`Falla reportada por ${f.requester_name} en ${f.location || 'Colegio'}: ${f.description}`);
+  });
+  const problemsText = problems.length > 0 ? problems.join('\n• ') : 'Sin incidencias ni problemas críticos registrados en la semana.';
+
+  // 2. Qué se reparó y completó
+  const completed = [];
+  tasks.doneList.forEach(t => {
+    completed.push(`[${t.category.toUpperCase()}] ${t.title}${t.location ? ` (${t.location})` : ''}`);
+  });
+  // Consultar intervenciones de inventario en la semana
+  const inventoryInterventions = db.prepare(`
+    SELECT s.*, eq.code, eq.name, eq.location
+    FROM inventory_services s
+    JOIN inventory eq ON s.equipment_id = eq.id
+    WHERE s.service_date >= ? AND s.service_date <= ?
+  `).all(range.from, range.to);
+  inventoryInterventions.forEach(inv => {
+    completed.push(`[INVENTARIO] ${inv.code} (${inv.name} - ${inv.location}): ${inv.action_taken}`);
+  });
+  const completedText = completed.length > 0 ? completed.join('\n• ') : 'No se cerraron tareas en este periodo.';
+
+  // 3. En qué se está trabajando (En curso)
+  const working = [];
+  tasks.doingList.forEach(t => {
+    working.push(`${t.title}${t.location ? ` en ${t.location}` : ''}`);
+  });
+  const workingText = working.length > 0 ? working.join('\n• ') : 'Sin tareas en curso actualmente.';
+
+  // 4. Qué trabajos quedan pendientes y compras
+  const pending = [];
+  tasks.waitingList.forEach(t => {
+    pending.push(`[ESPERANDO] ${t.title}: ${t.waiting_reason || 'Sin motivo especificado'}`);
+  });
+  // Tareas por hacer (todo)
+  const todoTasks = db.prepare("SELECT * FROM tasks WHERE status = 'todo' ORDER BY priority = 'alta' DESC, id DESC LIMIT 5").all();
+  todoTasks.forEach(t => {
+    pending.push(`[POR HACER] ${t.title}${t.location ? ` (${t.location})` : ''} - Prioridad: ${t.priority}`);
+  });
+  if (tasks.pendingPurchasesCount > 0) {
+    pending.push(`[COMPRAS PENDIENTES] ${tasks.pendingPurchasesCount} requerimientos (~$${tasks.pendingPurchasesTotal} USD)`);
+  }
+  const pendingText = pending.length > 0 ? pending.join('\n• ') : 'Sin trabajos pendientes pendientes.';
+
+  const insertStmt = db.prepare(`
+    INSERT INTO weekly_reports (
+      week_code, start_date, end_date, title, hours_assigned, hours_completed,
+      completion_percentage, problems_occurred, repaired_completed, working_on, pending_work, raw_data_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(week_code) DO UPDATE SET
+      hours_assigned = excluded.hours_assigned,
+      hours_completed = excluded.hours_completed,
+      completion_percentage = excluded.completion_percentage,
+      problems_occurred = excluded.problems_occurred,
+      repaired_completed = excluded.repaired_completed,
+      working_on = excluded.working_on,
+      pending_work = excluded.pending_work,
+      raw_data_json = excluded.raw_data_json,
+      generated_at = datetime('now', 'localtime')
+  `);
+
+  insertStmt.run(
+    weekCode,
+    range.from,
+    range.to,
+    title,
+    hours.assigned,
+    hours.completed,
+    hours.percentage,
+    problemsText,
+    completedText,
+    workingText,
+    pendingText,
+    JSON.stringify(report)
+  );
+
+  return db.prepare('SELECT * FROM weekly_reports WHERE week_code = ?').get(weekCode);
+}
+
+// GET /api/reports/saved (Lista de reportes semanales guardados)
+router.get('/saved', (req, res) => {
+  const db = getDb();
+  // Si hoy es viernes, asegurar que el reporte de esta semana quede generado
+  const today = new Date();
+  if (today.getDay() === 5) {
+    try {
+      saveWeeklyReport();
+    } catch (e) {
+      console.error('Error auto-generando reporte de viernes:', e);
+    }
+  }
+
+  const reports = db.prepare(`
+    SELECT id, week_code, start_date, end_date, title, hours_assigned, hours_completed, completion_percentage, generated_at
+    FROM weekly_reports
+    ORDER BY start_date DESC
+  `).all();
+  res.json(reports);
+});
+
+// GET /api/reports/saved/:id (Detalle de un reporte semanal guardado)
+router.get('/saved/:id', (req, res) => {
+  const db = getDb();
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'ID inválido.' });
+
+  const report = db.prepare('SELECT * FROM weekly_reports WHERE id = ?').get(id);
+  if (!report) return res.status(404).json({ error: 'Reporte no encontrado.' });
+
+  res.json(report);
+});
+
+// POST /api/reports/generate-week (Generar y guardar reporte semanal actual o por fecha)
+router.post('/generate-week', (req, res) => {
+  const { date } = req.body || {};
+  const saved = saveWeeklyReport(date || null);
+  res.json({
+    success: true,
+    message: 'Reporte semanal generado y guardado exitosamente.',
+    report: saved
+  });
+});
+
 // GET /api/reports ?period=week|month&date=YYYY-MM-DD
 router.get('/', (req, res) => {
   const { period = 'week', date } = req.query;

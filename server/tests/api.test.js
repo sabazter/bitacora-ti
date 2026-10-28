@@ -331,4 +331,38 @@ describe('Bitácora TI - Pruebas del Backend y Seguridad', () => {
     assert.ok(statsRes.body.total >= 1);
   });
 
+  test('Reportes Semanales de Viernes: generar, archivar y consultar reporte para supervisores', async () => {
+    // 1. Generar y guardar reporte semanal
+    const genRes = await request(app)
+      .post('/api/reports/generate-week')
+      .set('Cookie', authCookie)
+      .send({ date: '2026-10-28' });
+
+    assert.equal(genRes.status, 200);
+    assert.equal(genRes.body.success, true);
+    assert.ok(genRes.body.report.id);
+    assert.ok(genRes.body.report.title);
+    assert.ok(genRes.body.report.problems_occurred);
+    assert.ok(genRes.body.report.repaired_completed);
+    assert.ok(genRes.body.report.working_on);
+    assert.ok(genRes.body.report.pending_work);
+
+    // 2. Consultar lista de reportes guardados
+    const listRes = await request(app)
+      .get('/api/reports/saved')
+      .set('Cookie', authCookie);
+
+    assert.equal(listRes.status, 200);
+    assert.ok(Array.isArray(listRes.body));
+    assert.ok(listRes.body.length >= 1);
+
+    // 3. Consultar detalle de reporte guardado
+    const detailRes = await request(app)
+      .get(`/api/reports/saved/${genRes.body.report.id}`)
+      .set('Cookie', authCookie);
+
+    assert.equal(detailRes.status, 200);
+    assert.equal(detailRes.body.id, genRes.body.report.id);
+  });
+
 });

@@ -151,6 +151,27 @@ function initSchema(db) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_inventory_services_equipment_id ON inventory_services(equipment_id);
+
+    -- Reportes semanales guardados para supervisores
+    CREATE TABLE IF NOT EXISTS weekly_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      week_code TEXT UNIQUE NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      title TEXT NOT NULL,
+      hours_assigned REAL DEFAULT 0,
+      hours_completed REAL DEFAULT 0,
+      completion_percentage REAL DEFAULT 0,
+      problems_occurred TEXT,
+      repaired_completed TEXT,
+      working_on TEXT,
+      pending_work TEXT,
+      raw_data_json TEXT,
+      generated_at TEXT DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_weekly_reports_week_code ON weekly_reports(week_code);
+    CREATE INDEX IF NOT EXISTS idx_weekly_reports_start_date ON weekly_reports(start_date);
   `);
 }
 
